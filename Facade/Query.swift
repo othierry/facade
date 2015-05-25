@@ -62,20 +62,15 @@ public class Query<A: NSManagedObject> {
       component in component.componentsSeparatedByString(" ")
     }
     
-    var sortDescriptors : [NSSortDescriptor] = []
-    for component in components {
+    fetchRequest.sortDescriptors = components.map { component in
       if component.count > 2 {
         fatalError("sort(\(sortStr)) unrecognized format")
       } else if component.count == 2 {
-        sortDescriptors.append(
-          NSSortDescriptor(key: component[0], ascending: component[1] == "ASC"))
+        return NSSortDescriptor(key: component[0], ascending: component[1] == "ASC")
       } else {
-        sortDescriptors.append(
-          NSSortDescriptor(key: component[0], ascending: true))
+        return NSSortDescriptor(key: component[0], ascending: true)
       }
     }
-    
-    self.fetchRequest.sortDescriptors = sortDescriptors
     
     return self
   }
