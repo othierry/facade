@@ -21,10 +21,10 @@ public class Facade<A: NSManagedObject, B: ManagedObjectContextProvider> {
   ///
   /// :param inManagedObjectContext The context in which the object should be inserted (optional)
   /// :return A new instance of the ManagedObject
-  public class func create(_ inManagedObjectContext: NSManagedObjectContext? = nil) -> A {
+  public class func create(_ inManagedObjectContext: NSManagedObjectContext = B.managedObjectContext) -> A {
     return NSManagedObject(
       entity: entityDescription,
-      insertIntoManagedObjectContext: (inManagedObjectContext ?? B.managedObjectContext)
+      insertIntoManagedObjectContext: inManagedObjectContext
     ) as! A
   }
   
@@ -59,10 +59,10 @@ public class Facade<A: NSManagedObject, B: ManagedObjectContextProvider> {
   ///
   /// :param inManagedObjectContext The context in which the object should be inserted (optional)
   /// :return a instance of Query object
-  public class func query(_ managedObjectContext: NSManagedObjectContext? = nil) -> Query<A> {
+  public class func query(_ managedObjectContext: NSManagedObjectContext = B.managedObjectContext) -> Query<A> {
     let query = Query<A>(
       entity: entityDescription,
-      managedObjectContext: managedObjectContext ?? B.managedObjectContext)
+      managedObjectContext: managedObjectContext)
     return query
   }
   

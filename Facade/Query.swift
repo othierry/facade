@@ -431,18 +431,9 @@ public class Query<A: NSManagedObject> {
   }
   
   private func modifierFor(caseSensitive: Bool = true, diacriticSensitive: Bool = true) -> String {
-    if caseSensitive && diacriticSensitive {
-      return ""
-    }
-    var modifier = "["
-    if !caseSensitive {
-      modifier += "c"
-    }
-    if !diacriticSensitive {
-      modifier += "d"
-    }
-    modifier += "]"
-    return modifier
+    let modifiers = [(caseSensitive, "c"), (diacriticSensitive, "d")]
+    let activeModifiers = "".join(modifiers.filter { $0.0 }.map { $0.1 })
+    return Swift.count(activeModifiers) > 0 ? "[\(activeModifiers)]" : ""
   }
 
   private func shouldHandleError(error: NSError?) -> Bool {
