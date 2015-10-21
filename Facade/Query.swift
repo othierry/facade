@@ -1,5 +1,5 @@
 //
-//  ManagedObjectQuery.swift
+//  Query.swift
 //  Save
 //
 //  Created by Olivier THIERRY on 05/05/15.
@@ -9,47 +9,166 @@
 import Foundation
 import CoreData
 
+public struct QueryOptions : RawOptionSetType, BooleanType {
+
+  private let value: UInt
+  
+  public var boolValue: Bool {
+    return value != 0
+  }
+  
+  public var rawValue: UInt {
+    return value
+  }
+  
+  public init(nilLiteral: ()) {
+    self.value = 0
+  }
+  
+  public init(_ value: UInt = 0) {
+    self.value = value
+  }
+  
+  public init(rawValue value: UInt) {
+    self.value = value
+  }
+  
+  public func has(options: QueryOptions) -> Bool {
+    return self & options ? true : false
+  }
+  
+  public static var allZeros: QueryOptions { return self(0) }
+  public static var None: QueryOptions { return self(0b0000) }
+  public static var CaseInsensitive: QueryOptions { return self(0b0001) }
+  public static var DiacriticInsensitive: QueryOptions { return self(0b0010) }
+}
+
+public class ElasticQuery<A: NSManagedObject> {
+  public private(set) var query: Query<A>
+  public var batchSize: Int = 100
+  public var results: [A] = []
+  
+  public required init(query: Query<A>) {
+    self.query = query
+  }
+  
+  public func loadMore() -> [A] {
+    if canLoadMore {
+      query.limit(batchSize)
+      query.offset(results.count)
+      let batch = query.execute() as [A]
+      results += batch
+      return batch
+    } else {
+      return []
+    }
+  }
+  
+  public var canLoadMore: Bool {
+    return totalNumberOfResults > results.count
+  }
+  
+  public lazy var totalNumberOfResults: Int = {
+    return self.query.count()
+    }()
+}
+
 public class Query<A: NSManagedObject> {
   
-  private(set) var entity : NSEntityDescription
-  private(set) var managedObjectContext : NSManagedObjectContext
-  private(set) var fetchRequest : NSFetchRequest
+  public private(set) var managedObjectContext : NSManagedObjectContext
+  public private(set) var fetchRequest : NSFetchRequest
 
-  private var predicates: [NSPredicate]
-
-  /// If set to true, uniq values will be returned from the store
-  /// NOTE: if set to true, the query must be executed as Dictionnary
-  /// result type
-  public var distinct: Bool = false {
-    didSet {
-      self.fetchRequest.returnsDistinctResults = distinct
-    }
-  }
-  
-  /// Use this property to set the limit of the number of objects to fetch
-  public var limit: Int = 0 {
-    didSet {
-      self.fetchRequest.fetchLimit = limit
-    }
-  }
-  
-  /// Use this property to restrict the properties of entity A to fetch
-  /// from the store
-  public var properties: [AnyObject] = [] {
-    didSet {
-      self.fetchRequest.propertiesToFetch = properties
-    }
-  }
+  internal var predicates: [NSPredicate]
   
   /// Designed initializer
   ///
   /// :param entity the entity description the request should be attached to
   /// :param managedObjectContext the managedObjectContext the request should be executed against
-  required public init(entity: NSEntityDescription, managedObjectContext: NSManagedObjectContext) {
-    self.entity = entity
+  required public init() {
+    managedObjectContext = Facade.stack.mainManagedObjectContext
+    fetchRequest = NSFetchRequest(entityName: A.entityDescription.name!)
+    predicates = []
+  }
+
+  public class func or(queries: [Query<A>]) -> Query<A> {
+    let predicates = queries.flatMap { $0.predicates }
+    let query = Query<A>()
+    query.predicates = [NSCompoundPredicate.orPredicateWithSubpredicates(predicates)]
+    return query
+  }
+  
+  /// Shortcut accessor to execute the query as [A]
+  public func all() -> [A] {
+    return execute()
+  }
+  
+  /// Shortcut accessor to execute the query as A?
+  public func first() -> A? {
+    if let primaryKey = Facade.stack.config.modelPrimaryKey {
+      sort("\(primaryKey) ASC")
+    }
+    return limit(1).execute()
+  }
+
+  /// Shortcut accessor to execute the query as A?
+  public func last() -> A? {
+    if let primaryKey = Facade.stack.config.modelPrimaryKey {
+      sort("\(primaryKey) DESC")
+    }
+    return limit(1).execute()
+  }
+  
+  public func elastic() -> ElasticQuery<A> {
+    return ElasticQuery(query: self)
+  }
+
+  /// If set to true, uniq values will be returned from the store
+  /// NOTE: if set to true, the query must be executed as Dictionnary
+  /// result type
+  public func distinct(on: String? = nil) -> Self {
+    fetchRequest.returnsDistinctResults = true
+    if let on = on {
+      fetch([on])
+    }
+    return self
+  }
+  
+  /// Use this property to set the limit of the number of objects to fetch
+  public func limit(x: Int) -> Self {
+    fetchRequest.fetchLimit = x
+    return self
+  }
+  
+  public func offset(x: Int) -> Self {
+    fetchRequest.fetchOffset = x
+    return self
+  }
+  
+  public func fetchBatchSize(x: Int) -> Self {
+    fetchRequest.fetchBatchSize = x
+    return self
+  }
+  
+  public func prefetch(relations: [AnyObject]) -> Self {
+    fetchRequest.relationshipKeyPathsForPrefetching = relations
+    return self
+  }
+  
+  public func faults(returnsFaults: Bool) -> Self {
+    fetchRequest.returnsObjectsAsFaults = returnsFaults
+    return self
+  }
+  
+  /// Use this property to restrict the properties of entity A to fetch
+  /// from the store
+  public func fetch(properties: [AnyObject]) -> Self {
+    fetchRequest.propertiesToFetch = properties
+    return self
+  }
+  
+  public func inManagedObjectContext(managedObjectContext: NSManagedObjectContext) -> Self {
     self.managedObjectContext = managedObjectContext
-    self.fetchRequest = NSFetchRequest(entityName: entity.name!)
-    self.predicates = []
+    return self
   }
   
   /// Assign sorting order to the query results
@@ -109,11 +228,8 @@ public class Query<A: NSManagedObject> {
   /// :param: caseSensitive consider the search case sensitive
   /// :param: diacriticSensitive consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, containing value: String, caseSensitive: Bool = true,
-    diacriticSensitive: Bool = true) -> Self {
-    let modifier = modifierFor(
-      caseSensitive: caseSensitive,
-      diacriticSensitive: diacriticSensitive)
+  public func with(key: String, containing value: String, options: QueryOptions = .None) -> Self {
+    let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
         format: "\(key) CONTAINS\(modifier) %@",
@@ -128,10 +244,8 @@ public class Query<A: NSManagedObject> {
   /// :param: caseSensitive consider the search case sensitive
   /// :param: diacriticSensitive consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, like value: String, caseSensitive: Bool = true, diacriticSensitive: Bool = true) -> Self {
-    let modifier = modifierFor(
-      caseSensitive: caseSensitive,
-      diacriticSensitive: diacriticSensitive)
+  public func with(key: String, like value: String, options: QueryOptions = .None) -> Self {
+    let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
         format: "\(key) LIKE\(modifier) %@",
@@ -198,10 +312,8 @@ public class Query<A: NSManagedObject> {
   /// :param: caseSensitive consider the search case sensitive
   /// :param: diacriticSensitive consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, endingWith suffix: String, caseSensitive: Bool = true, diacriticSensitive: Bool = true) -> Self {
-    let modifier = modifierFor(
-      caseSensitive: caseSensitive,
-      diacriticSensitive: diacriticSensitive)
+  public func with(key: String, endingWith suffix: String, options: QueryOptions = .None) -> Self {
+    let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
         format: "\(key) ENDSWITH\(modifier) %@",
@@ -216,10 +328,8 @@ public class Query<A: NSManagedObject> {
   /// :param: caseSensitive consider the search case sensitive
   /// :param: diacriticSensitive consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, startingWith prefix: String, caseSensitive: Bool = true, diacriticSensitive: Bool = true) -> Self {
-    let modifier = modifierFor(
-      caseSensitive: caseSensitive,
-      diacriticSensitive: diacriticSensitive)
+  public func with(key: String, startingWith prefix: String, options: QueryOptions = .None) -> Self {
+    let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
         format: "\(key) BEGINSWITH\(modifier) %@",
@@ -234,10 +344,8 @@ public class Query<A: NSManagedObject> {
   /// :param: caseSensitive consider the search case sensitive
   /// :param: diacriticSensitive consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, equalTo value: AnyObject, caseSensitive: Bool = true, diacriticSensitive: Bool = true) -> Self {
-    var modifier = modifierFor(
-      caseSensitive: caseSensitive,
-      diacriticSensitive: diacriticSensitive)
+  public func with(key: String, equalTo value: AnyObject, options: QueryOptions = .None) -> Self {
+    var modifier = modifierFor(options)
     if modifier == "" {
       modifier = "="
     }
@@ -255,10 +363,8 @@ public class Query<A: NSManagedObject> {
   /// :param: caseSensitive consider the search case sensitive
   /// :param: diacriticSensitive consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, notEqualTo value: AnyObject, caseSensitive: Bool = true, diacriticSensitive: Bool = true) -> Self {
-    let modifier = modifierFor(
-      caseSensitive: caseSensitive,
-      diacriticSensitive: diacriticSensitive)
+  public func with(key: String, notEqualTo value: AnyObject, options: QueryOptions = .None) -> Self {
+    let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
         format: "\(key) !=\(modifier) %@",
@@ -384,6 +490,14 @@ public class Query<A: NSManagedObject> {
     return count
   }
 
+  public func delete() {
+    fetchRequest.includesPropertyValues = false
+    for object in execute() as [A] {
+      managedObjectContext.deleteObject(object)
+    }
+    Facade.stack.commitSync(managedObjectContext)
+  }
+  
   /// Execute the fetch request and return its first optional object
   /// :return: optional object
   public func execute() -> A? {
@@ -411,27 +525,37 @@ public class Query<A: NSManagedObject> {
     return _execute() as! [NSDictionary]
   }
 
-  private func _execute() -> [AnyObject]? {
+  /// Execute the fetch request as NSManagedObjectID return type
+  /// :return: [NSManagedObjectID]
+  public func execute() -> [NSManagedObjectID] {
+    fetchRequest.resultType = .ManagedObjectIDResultType
+    return _execute() as! [NSManagedObjectID]
+  }
+
+  private func _execute() -> [AnyObject]? {    
     if !predicates.isEmpty {
       fetchRequest.predicate = NSCompoundPredicate.andPredicateWithSubpredicates(predicates)
     }
     
     var error : NSError?
-    let objects = managedObjectContext.executeFetchRequest(
-      fetchRequest,
-      error: &error
-    )
+    var objects: [AnyObject]?
     
+    managedObjectContext.performBlockAndWait {
+      objects = self.managedObjectContext.executeFetchRequest(
+        self.fetchRequest,
+        error: &error)
+    }
+
     if shouldHandleError(error) {
       println("Error executing fetchRequest: \(fetchRequest). Error: \(error)")
       return []
     }
-    
+
     return objects
   }
   
-  private func modifierFor(caseSensitive: Bool = true, diacriticSensitive: Bool = true) -> String {
-    let modifiers = [(caseSensitive, "c"), (diacriticSensitive, "d")]
+  private func modifierFor(options: QueryOptions) -> String {
+    let modifiers = [(options.has(.CaseInsensitive), "c"), (options.has(.DiacriticInsensitive), "d")]
     let activeModifiers = "".join(modifiers.filter { $0.0 }.map { $0.1 })
     return Swift.count(activeModifiers) > 0 ? "[\(activeModifiers)]" : ""
   }

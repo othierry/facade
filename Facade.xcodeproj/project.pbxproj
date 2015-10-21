@@ -21,6 +21,10 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		6F3D5CF91B1A1FFC0077EFC0 /* Stack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3D5CF71B19EFE60077EFC0 /* Stack.swift */; };
+		6F3D5CFC1B1A20080077EFC0 /* Stack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F3D5CF71B19EFE60077EFC0 /* Stack.swift */; };
+		6F4069EE1B5C13FF0032FC1B /* Operators.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4069ED1B5C13FF0032FC1B /* Operators.swift */; };
+		6F4069F01B5C14B20032FC1B /* NSManagedObject+Additions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4069EF1B5C14B20032FC1B /* NSManagedObject+Additions.swift */; };
 		6FC8E9301B1205BF00318524 /* Facade.h in Headers */ = {isa = PBXBuildFile; fileRef = 6FC8E92F1B1205BF00318524 /* Facade.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		6FC8E9361B1205BF00318524 /* Facade.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FC8E92A1B1205BF00318524 /* Facade.framework */; };
 		6FC8E93D1B1205BF00318524 /* FacadeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC8E93C1B1205BF00318524 /* FacadeTests.swift */; };
@@ -41,6 +45,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		6F3D5CF71B19EFE60077EFC0 /* Stack.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Stack.swift; sourceTree = "<group>"; };
+		6F4069ED1B5C13FF0032FC1B /* Operators.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Operators.swift; sourceTree = "<group>"; };
+		6F4069EF1B5C14B20032FC1B /* NSManagedObject+Additions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSManagedObject+Additions.swift"; sourceTree = "<group>"; };
 		6FC8E92A1B1205BF00318524 /* Facade.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Facade.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		6FC8E92E1B1205BF00318524 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6FC8E92F1B1205BF00318524 /* Facade.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Facade.h; sourceTree = "<group>"; };
@@ -91,6 +98,9 @@
 		6FC8E92C1B1205BF00318524 /* Facade */ = {
 			isa = PBXGroup;
 			children = (
+				6F4069ED1B5C13FF0032FC1B /* Operators.swift */,
+				6F4069EF1B5C14B20032FC1B /* NSManagedObject+Additions.swift */,
+				6F3D5CF71B19EFE60077EFC0 /* Stack.swift */,
 				6FC8E9461B12060500318524 /* Query.swift */,
 				6FC8E9471B12060500318524 /* Facade.swift */,
 				6FC8E92F1B1205BF00318524 /* Facade.h */,
@@ -251,6 +261,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6F3D5CF91B1A1FFC0077EFC0 /* Stack.swift in Sources */,
+				6F4069EE1B5C13FF0032FC1B /* Operators.swift in Sources */,
+				6F4069F01B5C14B20032FC1B /* NSManagedObject+Additions.swift in Sources */,
 				6FC8E9491B12060500318524 /* Facade.swift in Sources */,
 				6FC8E9481B12060500318524 /* Query.swift in Sources */,
 			);
@@ -261,6 +274,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6FC8E94B1B1206CD00318524 /* Facade.swift in Sources */,
+				6F3D5CFC1B1A20080077EFC0 /* Stack.swift in Sources */,
 				6FC8E94A1B1206CD00318524 /* Query.swift in Sources */,
 				6FC8E93D1B1205BF00318524 /* FacadeTests.swift in Sources */,
 			);
@@ -458,6 +472,7 @@
 				6FBFE8251B131E6B00956A40 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		6FC8E9241B1205BF00318524 /* Build configuration list for PBXProject "Facade" */ = {
 			isa = XCConfigurationList;
