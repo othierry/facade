@@ -31,25 +31,29 @@ public class Stack {
     unregisterForManagedObjectContextNotifications()
   }
   
-  public func commit(_ managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) {
+  public func commit(managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) {
     managedObjectContext.performBlock {
-      println("commit \(managedObjectContext)")
-      var error: NSError?
-      if managedObjectContext.hasChanges && !managedObjectContext.save(&error) {
-        if let error = error {
-          println("[Facade.stack.commit] Error saving context \(managedObjectContext). Error: \(error)")
+      if managedObjectContext.hasChanges {
+        do {
+          try managedObjectContext.save()
+        } catch let error as NSError {
+          print("[Facade.stack.commit] Error saving context \(managedObjectContext). Error: \(error)")
+        } catch {
+          fatalError()
         }
       }
     }
   }
   
-  public func commitSync(_ managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) {
+  public func commitSync(managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) {
     managedObjectContext.performBlockAndWait {
-      println("commitSync \(managedObjectContext)")
-      var error: NSError?
-      if managedObjectContext.hasChanges && !managedObjectContext.save(&error) {
-        if let error = error {
-          println("[Facade.stack.commitSync] Error saving context \(managedObjectContext). Error: \(error)")
+      if managedObjectContext.hasChanges {
+        do {
+          try managedObjectContext.save()
+        } catch let error as NSError {
+          print("[Facade.stack.commitSync] Error saving context \(managedObjectContext). Error: \(error)")
+        } catch {
+          fatalError()
         }
       }
     }
@@ -90,23 +94,16 @@ public class Stack {
     return nil
   }
   
-  public func connect() -> Bool {
+  public func connect() throws {
     let storeURL = self.applicationDocumentsDirectory
       .URLByAppendingPathComponent(self.config.storeName!)
       .URLByAppendingPathExtension("sqlite")
-    
-    var error: NSError? = nil
-    
-    println("Connecting to \(storeURL)")
-    
-    let persistentStore = persistentStoreCoordinator.addPersistentStoreWithType(
+
+    try persistentStoreCoordinator.addPersistentStoreWithType(
       self.config.storeType,
       configuration: nil,
       URL: storeURL,
-      options: self.config.options,
-      error: &error)
-    
-    return persistentStore != nil
+      options: self.config.options)
   }
 
   public lazy var persistentStoreCoordinator: NSPersistentStoreCoordinator = {
@@ -128,7 +125,6 @@ public class Stack {
     }()
 
   public lazy var rootManagedObjectContext: NSManagedObjectContext = {
-    println("mainManagedObjectContext")
     let rootManagedObjectContext = self.createManagedObjectContext(.PrivateQueueConcurrencyType)
     rootManagedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator
     rootManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
@@ -136,7 +132,6 @@ public class Stack {
     }()
 
   public lazy var mainManagedObjectContext: NSManagedObjectContext = {
-    println("mainManagedObjectContext")
     let mainManagedObjectContext = self.createManagedObjectContext(.MainQueueConcurrencyType)
     mainManagedObjectContext.parentContext = self.rootManagedObjectContext
     return mainManagedObjectContext
@@ -145,7 +140,7 @@ public class Stack {
   private lazy var applicationDocumentsDirectory: NSURL = {
     return NSFileManager
       .defaultManager()
-      .URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0] as! NSURL
+      .URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0] 
     }()
 
   private lazy var applicationBackupDirectory: NSURL = {
@@ -153,13 +148,12 @@ public class Stack {
       .URLByAppendingPathComponent("backup")
     
     if !NSFileManager.defaultManager().fileExistsAtPath(backupDirectory.path!) {
-      NSFileManager
+      try! NSFileManager
         .defaultManager()
         .createDirectoryAtURL(
           backupDirectory,
           withIntermediateDirectories: false,
-          attributes: nil,
-          error: nil)
+          attributes: nil)
     }
     
     return backupDirectory
@@ -191,7 +185,7 @@ extension Stack {
         object: managedObjectContext)
   }
   
-  private func unregisterForManagedObjectContextNotifications(_ managedObjectContext: NSManagedObjectContext? = nil) {
+  private func unregisterForManagedObjectContextNotifications(managedObjectContext: NSManagedObjectContext? = nil) {
     NSNotificationCenter
       .defaultCenter()
       .removeObserver(
@@ -202,20 +196,20 @@ extension Stack {
   
   @objc
   private func managedObjectContextDidSave(notification: NSNotification) {
-    println("managedObjectContextDidSave")
+    print("managedObjectContextDidSave")
     
     if let savedContext = notification.object as? NSManagedObjectContext {
       if savedContext == mainManagedObjectContext {
-        println("write to disk")
+        print("write to disk")
         // Write to disk
         commit(rootManagedObjectContext)
       } else {
-        println("merging on children")
+        print("merging on children")
         // Propagate changes on childrens
         for (identifier, context) in childManagedObjectContexts {
-          println("checking \(identifier)")
+          print("checking \(identifier)")
           if context != savedContext {
-            println("merge on \(identifier)")
+            print("merge on \(identifier)")
             context.mergeChangesFromContextDidSaveNotification(notification)
           }
         }
@@ -227,80 +221,42 @@ extension Stack {
 
 extension Stack {
 
-  public func backup() {
-    for persistentStore in persistentStoreCoordinator.persistentStores as! [NSPersistentStore] {
+  public func backup() throws {
+    for persistentStore in persistentStoreCoordinator.persistentStores {
       if let persistentStoreFileName = persistentStore.URL?.lastPathComponent {
         let storeBackupUrl = applicationBackupDirectory
           .URLByAppendingPathComponent("backup-\(persistentStoreFileName)")
         
-        println("Backing up store from \(persistentStore.URL!) to \(storeBackupUrl)")
-        
-        persistentStoreCoordinator.migratePersistentStore(
+        try persistentStoreCoordinator.migratePersistentStore(
           persistentStore,
           toURL: storeBackupUrl,
           options: [
             NSSQLitePragmasOption: ["journal_mode": "DELETE"]
           ],
-          withType: NSSQLiteStoreType,
-          error: nil)
+          withType: NSSQLiteStoreType)
       }
     }
   }
-  
-//  public func restore() -> Bool {
-//    let backupStoreURL = NSBundle
-//      .mainBundle()
-//      .URLForResource(
-//        "backup-\(config.storeName!)",
-//        withExtension: "sqlite")
-//
-//    if let backupStoreURL = backupStoreURL  {
-//       let persistentStore = persistentStoreCoordinator.addPersistentStoreWithType(
-//        NSSQLiteStoreType,
-//        configuration: nil,
-//        URL: backupStoreURL,
-//        options: [NSReadOnlyPersistentStoreOption: true],
-//        error: nil)
-//
-//      let destinationURL = applicationDocumentsDirectory.URLByAppendingPathComponent("\(config.storeName!).sqlite")
-//
-//      if let persistentStore = persistentStore {
-//        println("Restoring store from \(backupStoreURL) to \(destinationURL)")
-//
-//        let migratedPersistentStore = persistentStoreCoordinator.migratePersistentStore(
-//          persistentStore,
-//          toURL: destinationURL,
-//          options: nil,
-//          withType: NSSQLiteStoreType,
-//          error: nil)
-//
-//        return migratedPersistentStore != nil
-//      }
-//    }
-//
-//    return false
-//  }
 
-  public func restore() -> Bool {
+  public func restore() throws {
     let backupStoreURL = NSBundle
       .mainBundle()
       .URLForResource(
         "backup-\(config.storeName!)",
         withExtension: "sqlite")
     
-    if let backupStoreURL = backupStoreURL  {
-      let destinationURL = applicationDocumentsDirectory
-        .URLByAppendingPathComponent("\(config.storeName!).sqlite")
-
-      return NSFileManager
-        .defaultManager()
-        .copyItemAtURL(
-          backupStoreURL,
-          toURL: destinationURL,
-          error: nil)
+    guard let _ = backupStoreURL else {
+      throw NSError(domain: "File not found", code: NSFileNoSuchFileError, userInfo: nil)
     }
     
-    return false
+    let destinationURL = applicationDocumentsDirectory
+      .URLByAppendingPathComponent("\(config.storeName!).sqlite")
+    
+    try NSFileManager
+      .defaultManager()
+      .copyItemAtURL(
+        backupStoreURL!,
+        toURL: destinationURL)
   }
 
 }

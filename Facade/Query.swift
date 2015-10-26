@@ -9,38 +9,26 @@
 import Foundation
 import CoreData
 
-public struct QueryOptions : RawOptionSetType, BooleanType {
+public struct QueryOptions: OptionSetType, BooleanType {
 
-  private let value: UInt
-  
+  public let rawValue: UInt
+
+  public init(rawValue: UInt) {
+      self.rawValue = rawValue
+  }
+
   public var boolValue: Bool {
-    return value != 0
+    return rawValue != 0
   }
-  
-  public var rawValue: UInt {
-    return value
-  }
-  
-  public init(nilLiteral: ()) {
-    self.value = 0
-  }
-  
-  public init(_ value: UInt = 0) {
-    self.value = value
-  }
-  
-  public init(rawValue value: UInt) {
-    self.value = value
-  }
-  
+
   public func has(options: QueryOptions) -> Bool {
-    return self & options ? true : false
+    return self.intersect(options) == options
   }
   
-  public static var allZeros: QueryOptions { return self(0) }
-  public static var None: QueryOptions { return self(0b0000) }
-  public static var CaseInsensitive: QueryOptions { return self(0b0001) }
-  public static var DiacriticInsensitive: QueryOptions { return self(0b0010) }
+  public static let None = QueryOptions(rawValue: 0)
+  public static let CaseInsensitive = QueryOptions(rawValue: 1)
+  public static let DiacriticInsensitive = QueryOptions(rawValue: 1 << 1)
+  
 }
 
 public class ElasticQuery<A: NSManagedObject> {
@@ -93,7 +81,7 @@ public class Query<A: NSManagedObject> {
   public class func or(queries: [Query<A>]) -> Query<A> {
     let predicates = queries.flatMap { $0.predicates }
     let query = Query<A>()
-    query.predicates = [NSCompoundPredicate.orPredicateWithSubpredicates(predicates)]
+    query.predicates = [NSCompoundPredicate(orPredicateWithSubpredicates: predicates)]
     return query
   }
   
@@ -149,7 +137,7 @@ public class Query<A: NSManagedObject> {
     return self
   }
   
-  public func prefetch(relations: [AnyObject]) -> Self {
+  public func prefetch(relations: [String]) -> Self {
     fetchRequest.relationshipKeyPathsForPrefetching = relations
     return self
   }
@@ -173,7 +161,7 @@ public class Query<A: NSManagedObject> {
   
   /// Assign sorting order to the query results
   ///
-  /// :param: sortStr The string describing the sort order of the query results
+  /// - parameter sortStr: The string describing the sort order of the query results
   /// (e.g: "age ASC", "age", "age ASC, id DESC")
   /// :return self
   public func sort(sortStr: String) -> Self {
@@ -196,8 +184,8 @@ public class Query<A: NSManagedObject> {
   
   /// restrict the results to objects where :key's value is contained in :objects
   ///
-  /// :param: key the entity's property name
-  /// :param: containedIn the values to match againsts
+  /// - parameter key: the entity's property name
+  /// - parameter containedIn: the values to match againsts
   /// :return: self
   public func with(key: String, containedIn objects: [AnyObject]) -> Self
   {
@@ -210,8 +198,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's value is not contained in :objects
   ///
-  /// :param: key the entity's property name
-  /// :param: notContainedIn the values to match againsts
+  /// - parameter key: the entity's property name
+  /// - parameter notContainedIn: the values to match againsts
   /// :return: self
   public func with(key: String, notContainedIn objects: [AnyObject]) -> Self {
     predicates.append(
@@ -223,10 +211,10 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's value contains the sequence string
   ///
-  /// :param: key the entity's property name
-  /// :param: value the sequence to match
-  /// :param: caseSensitive consider the search case sensitive
-  /// :param: diacriticSensitive consider the search diacritic sensitive
+  /// - parameter key: the entity's property name
+  /// - parameter value: the sequence to match
+  /// - parameter caseSensitive: consider the search case sensitive
+  /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
   public func with(key: String, containing value: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
@@ -239,10 +227,10 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's value is LIKE the given pattern
   ///
-  /// :param: key the entity's property name
-  /// :param: LIKE pattern
-  /// :param: caseSensitive consider the search case sensitive
-  /// :param: diacriticSensitive consider the search diacritic sensitive
+  /// - parameter key: the entity's property name
+  /// - parameter LIKE: pattern
+  /// - parameter caseSensitive: consider the search case sensitive
+  /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
   public func with(key: String, like value: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
@@ -255,8 +243,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's set/array contains all the given values
   ///
-  /// :param: key the entity's property name
-  /// :param: values the values the entity's set/array must contain
+  /// - parameter key: the entity's property name
+  /// - parameter values: the values the entity's set/array must contain
   /// :return: self
   public func with(key: String, containingAll values: [AnyObject]) -> Self {
     predicates.append(
@@ -268,8 +256,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's set/array contains none of the given values
   ///
-  /// :param: key the entity's property name
-  /// :param: values the values the entity's set/array must not contain
+  /// - parameter key: the entity's property name
+  /// - parameter values: the values the entity's set/array must not contain
   /// :return: self
   public func with(key: String, containingNone values: [AnyObject]) -> Self {
     predicates.append(
@@ -281,8 +269,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's set/array contains any of the given values
   ///
-  /// :param: key the entity's property name
-  /// :param: values the values the entity's set/array can contain
+  /// - parameter key: the entity's property name
+  /// - parameter values: the values the entity's set/array can contain
   /// :return: self
   public func with(key: String, containingAny values: [AnyObject]) -> Self {
     predicates.append(
@@ -294,8 +282,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must exist or not
   ///
-  /// :param: key the entity's property name
-  /// :param: exists true if the key must exists, false otherwise
+  /// - parameter key: the entity's property name
+  /// - parameter exists: true if the key must exists, false otherwise
   /// :return: self
   public func with(key: String, existing exists: Bool) -> Self {
     let matcher = exists ? "!=" : "=="
@@ -307,10 +295,10 @@ public class Query<A: NSManagedObject> {
   
   /// restrict the results to objects where :key's must have the given suffix
   ///
-  /// :param: key the entity's property name
-  /// :param: endingWith the suffix
-  /// :param: caseSensitive consider the search case sensitive
-  /// :param: diacriticSensitive consider the search diacritic sensitive
+  /// - parameter key: the entity's property name
+  /// - parameter endingWith: the suffix
+  /// - parameter caseSensitive: consider the search case sensitive
+  /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
   public func with(key: String, endingWith suffix: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
@@ -323,10 +311,10 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must have the given prefix
   ///
-  /// :param: key the entity's property name
-  /// :param: startingWith the prefix
-  /// :param: caseSensitive consider the search case sensitive
-  /// :param: diacriticSensitive consider the search diacritic sensitive
+  /// - parameter key: the entity's property name
+  /// - parameter startingWith: the prefix
+  /// - parameter caseSensitive: consider the search case sensitive
+  /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
   public func with(key: String, startingWith prefix: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
@@ -339,10 +327,10 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must be equal to the given value
   ///
-  /// :param: key the entity's property name
-  /// :param: equalTo the value
-  /// :param: caseSensitive consider the search case sensitive
-  /// :param: diacriticSensitive consider the search diacritic sensitive
+  /// - parameter key: the entity's property name
+  /// - parameter equalTo: the value
+  /// - parameter caseSensitive: consider the search case sensitive
+  /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
   public func with(key: String, equalTo value: AnyObject, options: QueryOptions = .None) -> Self {
     var modifier = modifierFor(options)
@@ -358,10 +346,10 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must not be equal to the given value
   ///
-  /// :param: key the entity's property name
-  /// :param: equalTo the value
-  /// :param: caseSensitive consider the search case sensitive
-  /// :param: diacriticSensitive consider the search diacritic sensitive
+  /// - parameter key: the entity's property name
+  /// - parameter equalTo: the value
+  /// - parameter caseSensitive: consider the search case sensitive
+  /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
   public func with(key: String, notEqualTo value: AnyObject, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
@@ -374,8 +362,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must not be greater than the value
   ///
-  /// :param: key the entity's property name
-  /// :param: greaterThan the value
+  /// - parameter key: the entity's property name
+  /// - parameter greaterThan: the value
   /// :return: self
   public func with(key: String, greaterThan value: Double) -> Self {
     predicates.append(
@@ -387,8 +375,8 @@ public class Query<A: NSManagedObject> {
   
   /// restrict the results to objects where :key's must not be greater than or equal the value
   ///
-  /// :param: key the entity's property name
-  /// :param: greaterThanOrEqual the value
+  /// - parameter key: the entity's property name
+  /// - parameter greaterThanOrEqual: the value
   /// :return: self
   public func with(key: String, greaterThanOrEqual value: Double) -> Self {
     predicates.append(
@@ -400,8 +388,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must not be greater than the value
   ///
-  /// :param: key the entity's property name
-  /// :param: greaterThan the value
+  /// - parameter key: the entity's property name
+  /// - parameter greaterThan: the value
   /// :return: self
   public func with(key: String, greaterThan value: Int) -> Self {
     predicates.append(
@@ -413,8 +401,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must not be greater than or equal the value
   ///
-  /// :param: key the entity's property name
-  /// :param: greaterThanOrEqual the value
+  /// - parameter key: the entity's property name
+  /// - parameter greaterThanOrEqual: the value
   /// :return: self
   public func with(key: String, greaterThanOrEqual value: Int) -> Self {
     predicates.append(
@@ -426,8 +414,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must not be lower than the value
   ///
-  /// :param: key the entity's property name
-  /// :param: lowerThan the value
+  /// - parameter key: the entity's property name
+  /// - parameter lowerThan: the value
   /// :return: self
   public func with(key: String, lowerThan value: Double) -> Self {
     predicates.append(
@@ -439,8 +427,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must not be lower than or equal the value
   ///
-  /// :param: key the entity's property name
-  /// :param: lowerThanOrEqual the value
+  /// - parameter key: the entity's property name
+  /// - parameter lowerThanOrEqual: the value
   /// :return: self
   public func with(key: String, lowerThanOrEqual value: Double) -> Self {
     predicates.append(
@@ -452,8 +440,8 @@ public class Query<A: NSManagedObject> {
   
   /// restrict the results to objects where :key's must not be lower than the value
   ///
-  /// :param: key the entity's property name
-  /// :param: lowerThan the value
+  /// - parameter key: the entity's property name
+  /// - parameter lowerThan: the value
   /// :return: self
   public func with(key: String, lowerThan value: Int) -> Self {
     predicates.append(
@@ -465,8 +453,8 @@ public class Query<A: NSManagedObject> {
 
   /// restrict the results to objects where :key's must not be lower than or equal the value
   ///
-  /// :param: key the entity's property name
-  /// :param: lowerThanOrEqual the value
+  /// - parameter key: the entity's property name
+  /// - parameter lowerThanOrEqual: the value
   /// :return: self
   public func with(key: String, lowerThanOrEqual value: Int) -> Self {
     predicates.append(
@@ -481,7 +469,7 @@ public class Query<A: NSManagedObject> {
   /// :return: the number of objects matching against query
   public func count() -> Int {
     if !predicates.isEmpty {
-      fetchRequest.predicate = NSCompoundPredicate.andPredicateWithSubpredicates(predicates)
+      fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
     }
     fetchRequest.includesSubentities = false
     var error: NSError?
@@ -491,10 +479,17 @@ public class Query<A: NSManagedObject> {
   }
 
   public func delete() {
+    // We do not need to loads any values
     fetchRequest.includesPropertyValues = false
-    for object in execute() as [A] {
-      managedObjectContext.deleteObject(object)
+
+    // Batch deletes into block
+    managedObjectContext.performBlockAndWait {
+      for object in self.execute() as [A] {
+        self.managedObjectContext.deleteObject(object)
+      }
     }
+    
+    // Commit
     Facade.stack.commitSync(managedObjectContext)
   }
   
@@ -534,21 +529,21 @@ public class Query<A: NSManagedObject> {
 
   private func _execute() -> [AnyObject]? {    
     if !predicates.isEmpty {
-      fetchRequest.predicate = NSCompoundPredicate.andPredicateWithSubpredicates(predicates)
+      fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
     }
     
-    var error : NSError?
     var objects: [AnyObject]?
     
     managedObjectContext.performBlockAndWait {
-      objects = self.managedObjectContext.executeFetchRequest(
-        self.fetchRequest,
-        error: &error)
-    }
-
-    if shouldHandleError(error) {
-      println("Error executing fetchRequest: \(fetchRequest). Error: \(error)")
-      return []
+      do {
+        objects = try self.managedObjectContext.executeFetchRequest(
+          self.fetchRequest)
+      } catch let error as NSError {
+        if self.shouldHandleError(error) {
+          print("Error executing fetchRequest: \(self.fetchRequest). Error: \(error)")
+        }
+        objects = []
+      }
     }
 
     return objects
@@ -556,8 +551,8 @@ public class Query<A: NSManagedObject> {
   
   private func modifierFor(options: QueryOptions) -> String {
     let modifiers = [(options.has(.CaseInsensitive), "c"), (options.has(.DiacriticInsensitive), "d")]
-    let activeModifiers = "".join(modifiers.filter { $0.0 }.map { $0.1 })
-    return Swift.count(activeModifiers) > 0 ? "[\(activeModifiers)]" : ""
+    let activeModifiers = modifiers.filter { $0.0 }.map { $0.1 }.joinWithSeparator("")
+    return activeModifiers.characters.count > 0 ? "[\(activeModifiers)]" : ""
   }
 
   private func shouldHandleError(error: NSError?) -> Bool {
@@ -565,7 +560,7 @@ public class Query<A: NSManagedObject> {
       return false
     }
     // @TODO: Do some error handling via event system
-    println("Error executing fetchRequest: \(fetchRequest). Error: \(error)")
+    print("Error executing fetchRequest: \(fetchRequest). Error: \(error)")
     return true
   }
 }

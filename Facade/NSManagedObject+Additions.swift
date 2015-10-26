@@ -16,8 +16,8 @@ public extension NSManagedObject {
   ///
   /// :param inManagedObjectContext The context in which the object should be inserted (optional)
   /// :return A new instance of the ManagedObject
-  class func create(_ inManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext) -> Self {
-    return self(
+  class func create(inManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext) -> Self {
+    return self.init(
       entity: entityDescription,
       insertIntoManagedObjectContext: inManagedObjectContext)
   }
@@ -26,7 +26,11 @@ public extension NSManagedObject {
   ///
   /// :param object The object to delete
   func delete() {
-    managedObjectContext?.deleteObject(self)
+    if let managedObjectContext = managedObjectContext {
+      managedObjectContext.performBlockAndWait {
+        managedObjectContext.deleteObject(self)
+      }
+    }
   }
   
   /// Returns the NSEntityDescription attached to Entity A
