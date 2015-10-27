@@ -79,7 +79,7 @@ public class Query<A: NSManagedObject> {
   }
 
   public class func or(queries: [Query<A>]) -> Query<A> {
-    let predicates = queries.flatMap { $0.predicates }
+    let predicates = queries.map { NSCompoundPredicate(andPredicateWithSubpredicates: $0.predicates) }
     let query = Query<A>()
     query.predicates = [NSCompoundPredicate(orPredicateWithSubpredicates: predicates)]
     return query
