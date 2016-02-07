@@ -147,6 +147,16 @@ public class Query<A: NSManagedObject> {
     return self
   }
   
+  public func refresh(refreshRefetchedObjects: Bool) -> Self {
+    fetchRequest.shouldRefreshRefetchedObjects = refreshRefetchedObjects
+    return self
+  }
+  
+  public func groupBy(properties: [AnyObject]) -> Self {
+    fetchRequest.propertiesToGroupBy = properties
+    return self
+  }
+  
   /// Use this property to restrict the properties of entity A to fetch
   /// from the store
   public func fetch(properties: [AnyObject]) -> Self {
@@ -157,6 +167,19 @@ public class Query<A: NSManagedObject> {
   public func inManagedObjectContext(managedObjectContext: NSManagedObjectContext) -> Self {
     self.managedObjectContext = managedObjectContext
     return self
+  }
+  
+  public func toFetchedResultsController(
+    sectionNameKeyPath sectionNameKeyPath: String? = nil,
+    cacheName: String? = nil) -> NSFetchedResultsController
+  {
+    setPredicate()
+    
+    return NSFetchedResultsController(
+      fetchRequest: self.fetchRequest,
+      managedObjectContext: self.managedObjectContext,
+      sectionNameKeyPath: sectionNameKeyPath,
+      cacheName: cacheName)
   }
   
   /// Assign sorting order to the query results
@@ -332,7 +355,11 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, equalTo value: AnyObject, options: QueryOptions = .None) -> Self {
+  public func with(key: String, equalTo value: AnyObject?, options: QueryOptions = .None) -> Self {
+    guard value != nil else {
+      return with(key, existing: false)
+    }
+    
     var modifier = modifierFor(options)
     if modifier == "" {
       modifier = "="
@@ -340,7 +367,7 @@ public class Query<A: NSManagedObject> {
     predicates.append(
       NSPredicate(
         format: "\(key) =\(modifier) %@",
-        argumentArray: [value]))
+        argumentArray: [value!]))
     return self
   }
 
@@ -351,12 +378,16 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, notEqualTo value: AnyObject, options: QueryOptions = .None) -> Self {
+  public func with(key: String, notEqualTo value: AnyObject?, options: QueryOptions = .None) -> Self {
+    guard value != nil else {
+      return with(key, existing: true)
+    }
+
     let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
         format: "\(key) !=\(modifier) %@",
-        argumentArray: [value]))
+        argumentArray: [value ?? "NIL"]))
     return self
   }
 
@@ -468,29 +499,51 @@ public class Query<A: NSManagedObject> {
   /// 
   /// :return: the number of objects matching against query
   public func count() -> Int {
-    if !predicates.isEmpty {
-      fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-    }
+    setPredicate()
+    
     fetchRequest.includesSubentities = false
+    
     var error: NSError?
-    let count = managedObjectContext.countForFetchRequest(fetchRequest, error: &error)
+    var count: Int!
+   
+    managedObjectContext.performBlockAndWait {
+      count = self.managedObjectContext.countForFetchRequest(
+        self.fetchRequest,
+        error: &error)
+    }
+    
     shouldHandleError(error)
     return count
   }
 
   public func delete() {
+    setPredicate()
+    
     // We do not need to loads any values
     fetchRequest.includesPropertyValues = false
 
-    // Batch deletes into block
     managedObjectContext.performBlockAndWait {
       for object in self.execute() as [A] {
         self.managedObjectContext.deleteObject(object)
       }
     }
+  }
+  
+  @available(iOS 9.0, *)
+  public func batchDelete() {
+    setPredicate()
+
+    let batchRequest = NSBatchDeleteRequest(fetchRequest: self.fetchRequest)
     
-    // Commit
-    Facade.stack.commitSync(managedObjectContext)
+    managedObjectContext.performBlockAndWait {
+      do {
+        try self.managedObjectContext.executeRequest(batchRequest)
+      } catch let error as NSError {
+        if self.shouldHandleError(error) {
+          print("Error executing batch deleted request: \(batchRequest), fetchRequest: \(self.fetchRequest) Error: \(error)")
+        }
+      }
+    }
   }
   
   /// Execute the fetch request and return its first optional object
@@ -527,10 +580,8 @@ public class Query<A: NSManagedObject> {
     return _execute() as! [NSManagedObjectID]
   }
 
-  private func _execute() -> [AnyObject]? {    
-    if !predicates.isEmpty {
-      fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-    }
+  private func _execute() -> [AnyObject]? {
+    setPredicate()
     
     var objects: [AnyObject]?
     
@@ -547,6 +598,14 @@ public class Query<A: NSManagedObject> {
     }
 
     return objects
+  }
+  
+  private func setPredicate() {
+    if !predicates.isEmpty {
+      fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+    } else {
+      fetchRequest.predicate = nil
+    }
   }
   
   private func modifierFor(options: QueryOptions) -> String {
