@@ -20,13 +20,13 @@ public class Stack {
     public var options: [NSObject : AnyObject] = [:]
   }
   
-  enum DetachedManagedObjectContextType {
+  public enum DetachedManagedObjectContextType {
     case Child, Independent
   }
   
   public private(set) var config = Config()
  
-  private var managedObjectContexts: [String : (type: DetachedManagedObjectContextType, managedObjectContext: NSManagedObjectContext)] = [:]
+  public var managedObjectContexts: [String : (type: DetachedManagedObjectContextType, managedObjectContext: NSManagedObjectContext)] = [:]
 
   private var childManagedObjectContexts: [NSManagedObjectContext] {
     return managedObjectContexts
@@ -50,10 +50,6 @@ public class Stack {
     unregisterForManagedObjectContextNotifications()
   }
 
-  public func commit(managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) {
-    commit(managedObjectContext, withCompletionHandler: nil)
-  }
-
   public func commit(
     managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext,
     withCompletionHandler completionHandler: (NSError? -> Void)?)
@@ -63,8 +59,14 @@ public class Stack {
         do {
           try managedObjectContext.save()
 
-          dispatch_async(dispatch_get_main_queue()) {
-            completionHandler?(nil)
+          if let parentManagedObjectContext = managedObjectContext.parentContext
+            where parentManagedObjectContext != self.rootManagedObjectContext
+          {
+            self.commit(parentManagedObjectContext, withCompletionHandler: completionHandler)
+          } else {
+            dispatch_async(dispatch_get_main_queue()) {
+              completionHandler?(nil)
+            }
           }
         } catch let error as NSError {
           print("[Facade.stack.commit] Error saving context \(managedObjectContext). Error: \(error)")
@@ -85,6 +87,13 @@ public class Stack {
       if managedObjectContext.hasChanges {
         do {
           try managedObjectContext.save()
+          managedObjectContext.processPendingChanges()
+
+          if let parentManagedObjectContext = managedObjectContext.parentContext
+            where parentManagedObjectContext != self.rootManagedObjectContext
+          {
+            self.commitSync(parentManagedObjectContext)
+          }
         } catch let error as NSError {
           print("[Facade.stack.commitSync] Error saving context \(managedObjectContext). Error: \(error)")
         }
@@ -265,33 +274,48 @@ extension Stack {
   
   @objc
   private func managedObjectContextDidSave(notification: NSNotification) {
-    guard let savedManagedObjectContext = notification.object as? NSManagedObjectContext else {
-      return
+    guard
+      let savedManagedObjectContext = notification.object as? NSManagedObjectContext
+      else { return }
+    
+    // Break retain cycles and release memory
+    // on the saved context
+    savedManagedObjectContext.performBlock {
+      savedManagedObjectContext.refreshAllObjects()
     }
     
-    guard let parentManagedObjectContext = savedManagedObjectContext.parentContext else {
-      return
-    }
+    guard
+      savedManagedObjectContext.parentContext == self.rootManagedObjectContext
+      else { return }
     
-    if parentManagedObjectContext == rootManagedObjectContext {
-      print("[managedObjectContextDidSave][CHILD] writing to disk (async)")
-      commit(parentManagedObjectContext)
-    } else {
-      print("[managedObjectContextDidSave][CHILD] saving parent (sync)")
-      commitSync(parentManagedObjectContext)
-    }
-    
-    if independentManagedObjectContexts.contains(savedManagedObjectContext) {
-      print("[managedObjectContextDidSave][INDEPENDENT] merging on other independent contexts")
-      // Independent context
-      for independentManagedObjectContext in independentManagedObjectContexts
-        where independentManagedObjectContext != savedManagedObjectContext
-      {
-        independentManagedObjectContext.performBlockAndWait {
-          independentManagedObjectContext.mergeChangesFromContextDidSaveNotification(notification)
+    // Independent context
+    for independentManagedObjectContext in independentManagedObjectContexts
+      where independentManagedObjectContext != savedManagedObjectContext
+    {
+      independentManagedObjectContext.performBlock {
+        // NSManagedObjectContext's merge routine ignores updated objects which aren't
+        // currently faulted in. To force it to notify interested clients that such
+        // objects have been refreshed (e.g. NSFetchedResultsController) we need to
+        // force them to be faulted in ahead of the merge
+        // SEE: http://mikeabdullah.net/merging-saved-changes-betwe.html
+        if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
+          for updatedObject in updatedObjects {
+            let _ = try? independentManagedObjectContext.existingObjectWithID(updatedObject.objectID)
+          }
         }
+        
+        // Merge changes on the idependent context
+        independentManagedObjectContext.mergeChangesFromContextDidSaveNotification(
+          notification)
+        
+        // Break retain cycles, release unnessecary memory
+        // after the merge occurs
+        independentManagedObjectContext.refreshAllObjects()
       }
     }
+    
+    // Write to disk
+    commit(self.rootManagedObjectContext, withCompletionHandler: nil)
   }
 
 }
