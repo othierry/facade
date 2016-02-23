@@ -344,7 +344,8 @@ extension Stack {
           persistentStore,
           toURL: storeBackupUrl,
           options: [
-            NSSQLitePragmasOption: ["journal_mode": "DELETE"]
+            NSSQLitePragmasOption: ["journal_mode": "DELETE"],
+            NSSQLiteManualVacuumOption: true
           ],
           withType: NSSQLiteStoreType)
       }
