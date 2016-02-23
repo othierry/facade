@@ -519,7 +519,7 @@ public class Query<A: NSManagedObject> {
   public func delete() {
     setPredicate()
     
-    // We do not need to loads any values
+    // We do not need to load any values
     fetchRequest.includesPropertyValues = false
 
     managedObjectContext.performBlockAndWait {
