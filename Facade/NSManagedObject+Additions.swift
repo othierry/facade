@@ -41,16 +41,6 @@ public extension NSManagedObject {
     }
   }
   
-  func refresh(mergeChanges: Bool = true) {
-    if let managedObjectContext = managedObjectContext {
-      managedObjectContext.refreshObject(self, mergeChanges: mergeChanges)
-    }
-  }
-  
-  func fault() {
-    refresh(false)
-  }
-  
   public class var entityName: String {
     return NSStringFromClass(self).componentsSeparatedByString(".").last!
   }
