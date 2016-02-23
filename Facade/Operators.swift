@@ -13,9 +13,9 @@ import CoreData
 infix operator <- {}
 
 // child contexts
-infix operator ~<> {}
-infix operator -<> {}
-infix operator -/<> {}
+infix operator <=> {}
+infix operator <-> {}
+infix operator </> {}
 
 /**
  Register a new child context with `.MainQueueConcurrencyType`
@@ -36,10 +36,17 @@ infix operator -/<> {}
  ```
  
  */
-public func -<>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
+public func <=>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
   return Facade.stack.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
+    concurrencyType: .MainQueueConcurrencyType)
+}
+
+public func <=>(left: Stack, right: String) -> NSManagedObjectContext {
+  return Facade.stack.registerChildContextWithIdentifier(
+    right,
+    parentManagedObjectContext: left.mainManagedObjectContext,
     concurrencyType: .MainQueueConcurrencyType)
 }
 
@@ -62,11 +69,38 @@ public func -<>(left: NSManagedObjectContext, right: String) -> NSManagedObjectC
  ```
  
  */
-public func ~<>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
+public func <->(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
   return Facade.stack.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
     concurrencyType: .PrivateQueueConcurrencyType)
+}
+
+public func <->(left: Stack, right: String) -> NSManagedObjectContext {
+  return Facade.stack.registerChildContextWithIdentifier(
+    right,
+    parentManagedObjectContext: left.mainManagedObjectContext,
+    concurrencyType: .PrivateQueueConcurrencyType)
+}
+
+
+/**
+ Unregister a child context with the given identifier
+ If no suck context exists. The fonction will do nothing.
+ 
+ - Parameters:
+ - left: The CoreData's stack
+ - right: The identifier of the child context
+ 
+ This is equivalent to:
+ 
+ ```
+ left.unregisterChildContextWithIdentifier(right)
+ ```
+ 
+ */
+public func </>(left: Stack, right: String) {
+  return left.unregisterContextWithIdentifier(right)
 }
 
 /**
@@ -93,23 +127,4 @@ public func <-<A: NSManagedObject>(left: NSManagedObjectContext, right: A) -> A 
     object = left.objectWithID(right.objectID) as! A
   }
   return object
-}
-
-/**
-  Unregister a child context with the given identifier
-  If no suck context exists. The fonction will do nothing.
-
-  - Parameters:
-    - left: The CoreData's stack
-    - right: The identifier of the child context
-
-  This is equivalent to:
-
-  ```
-  left.unregisterChildContextWithIdentifier(right)
-  ```
-
-*/
-public func -/<>(left: Stack, right: String) {
-  return left.unregisterContextWithIdentifier(right)
 }
