@@ -11,9 +11,7 @@ import CoreData
 
 public class Facade {
   
-  public static var stack: Stack {
-    return Stack.sharedInstance
-  }
+  public static var stack = Stack()
   
   public static func query<A: NSManagedObject>(type: A.Type) -> Query<A> {
     return Query<A>()

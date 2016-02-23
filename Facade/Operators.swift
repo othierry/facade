@@ -10,31 +10,63 @@ import Foundation
 import CoreData
 
 // Common
-infix operator <-  {}
-infix operator </> {}
+infix operator <- {}
 
 // child contexts
-infix operator <>  {}
-infix operator <<>> {}
+infix operator ~<> {}
+infix operator -<> {}
+infix operator -/<> {}
 
-// independent contexts (nodes)
-infix operator <*> {}
-infix operator <<*>> {}
-
-public func <*>(left: Stack, right: String) -> NSManagedObjectContext {
-  return left.registerIndependentContextWithIdentifier(right)
+/**
+ Register a new child context with `.MainQueueConcurrencyType`
+ concurrency type. The Child context is uniq by its given identifier.
+ 
+ The registered context has it's parent context set to `Stack.mainManagedObjectContext`
+ 
+ - Parameters:
+ - left: The CoreData's stack
+ - right: The identifier of the child context
+ 
+ - Returns: the registered child context
+ 
+ This is equivalent to:
+ 
+ ```
+ left.registerChildContextWithIdentifier(right)
+ ```
+ 
+ */
+public func -<>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
+  return Facade.stack.registerChildContextWithIdentifier(
+    right,
+    parentManagedObjectContext: left,
+    concurrencyType: .MainQueueConcurrencyType)
 }
 
-public func <<*>>(left: Stack, right: String) -> NSManagedObjectContext {
-  return left.registerIndependentContextWithIdentifier(right, concurrencyType: .MainQueueConcurrencyType)
-}
-
-public func <>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
-  return Facade.stack.registerChildContextWithIdentifier(right, parentManagedObjectContext: left)
-}
-
-public func <<>>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
-  return Facade.stack.registerChildContextWithIdentifier(right, parentManagedObjectContext: left, concurrencyType: .MainQueueConcurrencyType)
+/**
+ Register a new child context with `.PrivateQueueConcurrencyType`
+ concurrency type. The Child context is uniq by its given identifier.
+ 
+ The registered context has it's parent context set to `Stack.mainManagedObjectContext`
+ 
+ - Parameters:
+ - left: The CoreData's stack
+ - right: The identifier of the child context
+ 
+ - Returns: the registered child context
+ 
+ This is equivalent to:
+ 
+ ```
+ left.registerChildContextWithIdentifier(right)
+ ```
+ 
+ */
+public func ~<>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
+  return Facade.stack.registerChildContextWithIdentifier(
+    right,
+    parentManagedObjectContext: left,
+    concurrencyType: .PrivateQueueConcurrencyType)
 }
 
 /**
@@ -64,53 +96,6 @@ public func <-<A: NSManagedObject>(left: NSManagedObjectContext, right: A) -> A 
 }
 
 /**
-  Register a new child context with `.PrivateQueueConcurrencyType`
-  concurrency type. The Child context is uniq by its given identifier.
-  
-  The registered context has it's parent context set to `Stack.mainManagedObjectContext`
-
-  - Parameters:
-    - left: The CoreData's stack
-    - right: The identifier of the child context
-
-  - Returns: the registered child context
-
-  This is equivalent to:
-
-  ```
-  left.registerChildContextWithIdentifier(right)
-  ```
-
-*/
-public func <>(left: Stack, right: String) -> NSManagedObjectContext {
-  return left.registerChildContextWithIdentifier(right)
-}
-
-
-/**
- Register a new child context with `.MainQueueConcurrencyType`
- concurrency type. The Child context is uniq by its given identifier.
- 
- The registered context has it's parent context set to `Stack.mainManagedObjectContext`
- 
- - Parameters:
- - left: The CoreData's stack
- - right: The identifier of the child context
- 
- - Returns: the registered child context
- 
- This is equivalent to:
- 
- ```
- left.registerChildContextWithIdentifier(right)
- ```
- 
- */
-public func <<>>(left: Stack, right: String) -> NSManagedObjectContext {
-  return left.registerChildContextWithIdentifier(right, concurrencyType: .MainQueueConcurrencyType)
-}
-
-/**
   Unregister a child context with the given identifier
   If no suck context exists. The fonction will do nothing.
 
@@ -125,6 +110,6 @@ public func <<>>(left: Stack, right: String) -> NSManagedObjectContext {
   ```
 
 */
-public func </>(left: Stack, right: String) {
+public func -/<>(left: Stack, right: String) {
   return left.unregisterContextWithIdentifier(right)
 }

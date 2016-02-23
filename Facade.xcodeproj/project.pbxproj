@@ -77,6 +77,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4FD5E1681C7C82F90096AFA6 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				6F3D5CF71B19EFE60077EFC0 /* Stack.swift */,
+				6FC8E9461B12060500318524 /* Query.swift */,
+				6FC8E9471B12060500318524 /* Facade.swift */,
+				6FC8E92F1B1205BF00318524 /* Facade.h */,
+			);
+			name = Core;
+			sourceTree = "<group>";
+		};
 		6FC8E9201B1205BF00318524 = {
 			isa = PBXGroup;
 			children = (
@@ -98,12 +109,9 @@
 		6FC8E92C1B1205BF00318524 /* Facade */ = {
 			isa = PBXGroup;
 			children = (
+				4FD5E1681C7C82F90096AFA6 /* Core */,
 				6F4069ED1B5C13FF0032FC1B /* Operators.swift */,
 				6F4069EF1B5C14B20032FC1B /* NSManagedObject+Additions.swift */,
-				6F3D5CF71B19EFE60077EFC0 /* Stack.swift */,
-				6FC8E9461B12060500318524 /* Query.swift */,
-				6FC8E9471B12060500318524 /* Facade.swift */,
-				6FC8E92F1B1205BF00318524 /* Facade.h */,
 				6FC8E92D1B1205BF00318524 /* Supporting Files */,
 			);
 			path = Facade;

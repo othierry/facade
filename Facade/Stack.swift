@@ -20,28 +20,24 @@ public class Stack {
     public var options: [NSObject : AnyObject] = [:]
   }
   
-  public enum DetachedManagedObjectContextType {
-    case Child, Independent
-  }
-  
   public private(set) var config = Config()
  
-  public var managedObjectContexts: [String : (type: DetachedManagedObjectContextType, managedObjectContext: NSManagedObjectContext)] = [:]
+  private var managedObjectContexts: [String: NSManagedObjectContext] = [:]
 
   private var childManagedObjectContexts: [NSManagedObjectContext] {
     return managedObjectContexts
-      .filter { $1.type == .Child }
-      .map { $1.managedObjectContext }
+      .filter { $1.parentContext == self.mainManagedObjectContext }
+      .map { $1 }
   }
 
   private var independentManagedObjectContexts: [NSManagedObjectContext] {
     return managedObjectContexts
-      .filter { $1.type == .Independent }
-      .map { $1.managedObjectContext }
+      .filter { $1.parentContext == self.rootManagedObjectContext }
+      .map { $1 }
     + [mainManagedObjectContext] // Include main context as independent
   }
 
-  private init() {
+  public init() {
     registerForManagedObjectContextNotifications(mainManagedObjectContext)
     registerForManagedObjectContextNotifications(rootManagedObjectContext)
   }
@@ -50,145 +46,12 @@ public class Stack {
     unregisterForManagedObjectContextNotifications()
   }
 
-  public func commit(
-    managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext,
-    withCompletionHandler completionHandler: (NSError? -> Void)?)
-  {
-    managedObjectContext.performBlock {
-      if managedObjectContext.hasChanges {
-        do {
-          try managedObjectContext.save()
-
-          if let parentManagedObjectContext = managedObjectContext.parentContext
-            where parentManagedObjectContext != self.rootManagedObjectContext
-          {
-            self.commit(parentManagedObjectContext, withCompletionHandler: completionHandler)
-          } else {
-            dispatch_async(dispatch_get_main_queue()) {
-              completionHandler?(nil)
-            }
-          }
-        } catch let error as NSError {
-          print("[Facade.stack.commit] Error saving context \(managedObjectContext). Error: \(error)")
-          dispatch_async(dispatch_get_main_queue()) {
-            completionHandler?(error)
-          }
-        }
-      } else {
-        dispatch_async(dispatch_get_main_queue()) {
-          completionHandler?(nil)
-        }
-      }
-    }
-  }
-
-  public func commitSync(managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) {
-    managedObjectContext.performBlockAndWait {
-      if managedObjectContext.hasChanges {
-        do {
-          try managedObjectContext.save()
-          managedObjectContext.processPendingChanges()
-
-          if let parentManagedObjectContext = managedObjectContext.parentContext
-            where parentManagedObjectContext != self.rootManagedObjectContext
-          {
-            self.commitSync(parentManagedObjectContext)
-          }
-        } catch let error as NSError {
-          print("[Facade.stack.commitSync] Error saving context \(managedObjectContext). Error: \(error)")
-        }
-      }
-    }
-  }
-  
-  public func createManagedObjectContext(concurrencyType: NSManagedObjectContextConcurrencyType) -> NSManagedObjectContext {
-    return  NSManagedObjectContext(
-      concurrencyType: concurrencyType)
-  }
-
-  public func registerChildContextWithIdentifier(
-    identifier: String,
-    parentManagedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext,
-    concurrencyType: NSManagedObjectContextConcurrencyType = .PrivateQueueConcurrencyType) -> NSManagedObjectContext {
-    if let managedObjectContextContainer = managedObjectContexts[identifier] {
-      guard managedObjectContextContainer.type == .Child else {
-        fatalError("")
-      }
-      
-      return managedObjectContextContainer.managedObjectContext
-    }
-    
-    let managedObjectContext = createManagedObjectContext(concurrencyType)
-    managedObjectContext.parentContext = parentManagedObjectContext
-    managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-    registerForManagedObjectContextNotifications(managedObjectContext)
-    managedObjectContexts[identifier] = (.Child, managedObjectContext)
-    
-    return managedObjectContext
-  }
-
-  public func registerIndependentContextWithIdentifier(identifier: String, concurrencyType: NSManagedObjectContextConcurrencyType = .PrivateQueueConcurrencyType) -> NSManagedObjectContext {
-    if let managedObjectContextContainer = managedObjectContexts[identifier] {
-      guard managedObjectContextContainer.type == .Independent else {
-        fatalError("")
-      }
-      
-      return managedObjectContextContainer.managedObjectContext
-    }
-    
-    let managedObjectContext = createManagedObjectContext(concurrencyType)
-    managedObjectContext.parentContext = rootManagedObjectContext
-    managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-    registerForManagedObjectContextNotifications(managedObjectContext)
-    managedObjectContexts[identifier] = (.Independent, managedObjectContext)
-    
-    return managedObjectContext
-  }
-
-  public func unregisterContextWithIdentifier(identifier: String) {
-    guard let managedObjectContextContainer = managedObjectContexts[identifier] else {
-      return
-    }
-    
-    unregisterForManagedObjectContextNotifications(managedObjectContextContainer.managedObjectContext)
-    
-    managedObjectContextContainer.managedObjectContext.performBlock {
-      managedObjectContextContainer.managedObjectContext.reset()
-    }
-    
-    // managedObjectContext is retained by performBlock's block
-    // so we can remove it now
-    self.managedObjectContexts.removeValueForKey(identifier)
-  }
-  
-  public func identifierForContext(managedObjectContext: NSManagedObjectContext) -> String? {
-    for (identifier, contextContainer) in managedObjectContexts {
-      if contextContainer.managedObjectContext === managedObjectContext {
-        return identifier
-      }
-    }
-    
-    return nil
-  }
-  
-  public func connect() throws {
-    let storeURL = self.applicationDocumentsDirectory
-      .URLByAppendingPathComponent(self.config.storeName!)
-      .URLByAppendingPathExtension("sqlite")
-
-    try persistentStoreCoordinator.addPersistentStoreWithType(
-      self.config.storeType,
-      configuration: nil,
-      URL: storeURL,
-      options: self.config.options)
-  }
-
   public lazy var persistentStoreCoordinator: NSPersistentStoreCoordinator = {
     let persistentStoreCoordinator = NSPersistentStoreCoordinator(
       managedObjectModel: self.managedObjectModel)
     
     return persistentStoreCoordinator
-    }()
+  }()
   
   public lazy var managedObjectModel: NSManagedObjectModel = {
     if let modelName = self.config.modelName {
@@ -199,58 +62,179 @@ public class Stack {
     } else {
       return NSManagedObjectModel.mergedModelFromBundles(nil)!
     }
-    }()
+  }()
 
   public lazy var rootManagedObjectContext: NSManagedObjectContext = {
     let rootManagedObjectContext = self.createManagedObjectContext(.PrivateQueueConcurrencyType)
     rootManagedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator
     rootManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     return rootManagedObjectContext
-    }()
-
+  }()
+  
   public lazy var mainManagedObjectContext: NSManagedObjectContext = {
     let mainManagedObjectContext = self.createManagedObjectContext(.MainQueueConcurrencyType)
     mainManagedObjectContext.parentContext = self.rootManagedObjectContext
     mainManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     return mainManagedObjectContext
-    }()
+  }()
   
   private lazy var applicationDocumentsDirectory: NSURL = {
     return NSFileManager
       .defaultManager()
-      .URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0] 
-    }()
-
+      .URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0]
+  }()
+  
   private lazy var applicationBackupDirectory: NSURL = {
     let backupDirectory = self.applicationDocumentsDirectory
       .URLByAppendingPathComponent("facade:backup")
     
-    if !NSFileManager.defaultManager().fileExistsAtPath(backupDirectory.path!) {
-      try! NSFileManager
-        .defaultManager()
-        .createDirectoryAtURL(
-          backupDirectory,
-          withIntermediateDirectories: false,
-          attributes: nil)
-    }
+    guard
+      !NSFileManager.defaultManager().fileExistsAtPath(backupDirectory.path!)
+      else { return backupDirectory }
+    
+    // Create backup directory
+    try! NSFileManager
+      .defaultManager()
+      .createDirectoryAtURL(
+        backupDirectory,
+        withIntermediateDirectories: true,
+        attributes: nil)
     
     return backupDirectory
-    }()
+  }()
 }
 
-// Singleton
+// Managed object contexts management
 extension Stack {
 
-  class var sharedInstance: Stack {
-    struct Singleton {
-      static let instance = Stack()
+  public func createManagedObjectContext(concurrencyType: NSManagedObjectContextConcurrencyType) -> NSManagedObjectContext {
+    return  NSManagedObjectContext(
+      concurrencyType: concurrencyType)
+  }
+  
+  public func registerChildContextWithIdentifier(
+    identifier: String,
+    parentManagedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext,
+    concurrencyType: NSManagedObjectContextConcurrencyType = .PrivateQueueConcurrencyType) -> NSManagedObjectContext
+  {
+    if let managedObjectContext = managedObjectContexts[identifier] {
+      return managedObjectContext
     }
-    return Singleton.instance
+    
+    let managedObjectContext = createManagedObjectContext(concurrencyType)
+    managedObjectContext.parentContext = parentManagedObjectContext
+    registerForManagedObjectContextNotifications(managedObjectContext)
+    managedObjectContexts[identifier] = managedObjectContext
+    
+    return managedObjectContext
+  }
+  
+  public func registerIndependentContextWithIdentifier(
+    identifier: String,
+    concurrencyType: NSManagedObjectContextConcurrencyType = .PrivateQueueConcurrencyType) -> NSManagedObjectContext
+  {
+    if let managedObjectContext = managedObjectContexts[identifier] {
+      return managedObjectContext
+    }
+    
+    let managedObjectContext = createManagedObjectContext(concurrencyType)
+    managedObjectContext.parentContext = rootManagedObjectContext
+    registerForManagedObjectContextNotifications(managedObjectContext)
+    managedObjectContexts[identifier] = managedObjectContext
+    
+    return managedObjectContext
+  }
+  
+  public func unregisterContextWithIdentifier(identifier: String) {
+    guard let managedObjectContext = managedObjectContexts[identifier] else {
+      return
+    }
+    
+    unregisterForManagedObjectContextNotifications(managedObjectContext)
+    
+    managedObjectContext.performBlock {
+      managedObjectContext.reset()
+    }
+    
+    // managedObjectContext is retained by performBlock's block
+    // so we can remove it now
+    self.managedObjectContexts.removeValueForKey(identifier)
+  }
+  
+  public func identifierForContext(managedObjectContext: NSManagedObjectContext) -> String? {
+    for (identifier, context) in managedObjectContexts {
+      if context === managedObjectContext {
+        return identifier
+      }
+    }
+    
+    return nil
   }
 
 }
 
-// Notifications
+// Persistence
+extension Stack {
+  
+  public func commit(
+    managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext,
+    withCompletionHandler completionHandler: (NSError? -> Void)?)
+  {
+    let complete = { error in
+      dispatch_async(dispatch_get_main_queue()) {
+        completionHandler?(error)
+      }
+    }
+    
+    managedObjectContext.performBlock {
+      guard
+        managedObjectContext.hasChanges
+        else { return complete(nil) }
+      
+      do {
+        try managedObjectContext.save()
+        
+        guard
+          let parentManagedObjectContext = managedObjectContext.parentContext
+          where parentManagedObjectContext != self.rootManagedObjectContext
+          else { return complete(nil) }
+        
+        self.commit(
+          parentManagedObjectContext,
+          withCompletionHandler: completionHandler)
+      } catch let error as NSError {
+        print("[Facade.stack.commit] Error saving context \(managedObjectContext). Error: \(error)")
+        complete(error)
+      }
+    }
+  }
+  
+  public func commitSync(
+    managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext)
+  {
+    managedObjectContext.performBlockAndWait {
+      guard
+        managedObjectContext.hasChanges
+        else { return }
+      
+      do {
+        try managedObjectContext.save()
+        managedObjectContext.processPendingChanges()
+        
+        if let parentManagedObjectContext = managedObjectContext.parentContext
+          where parentManagedObjectContext != self.rootManagedObjectContext
+        {
+          self.commitSync(parentManagedObjectContext)
+        }
+      } catch let error as NSError {
+        print("[Facade.stack.commitSync] Error saving context \(managedObjectContext). Error: \(error)")
+      }
+    }
+  }
+  
+}
+
+// Notifications & Merging
 extension Stack {
 
   private func registerForManagedObjectContextNotifications(managedObjectContext: NSManagedObjectContext) {
@@ -320,6 +304,7 @@ extension Stack {
 
 }
 
+// Connect, backup & seed APIs
 extension Stack {
 
   public var installed: Bool {
@@ -331,7 +316,19 @@ extension Stack {
       .defaultManager()
       .fileExistsAtPath(storePath)
   }
-  
+
+  public func connect() throws {
+    let storeURL = self.applicationDocumentsDirectory
+      .URLByAppendingPathComponent(self.config.storeName!)
+      .URLByAppendingPathExtension("sqlite")
+    
+    try persistentStoreCoordinator.addPersistentStoreWithType(
+      self.config.storeType,
+      configuration: nil,
+      URL: storeURL,
+      options: self.config.options)
+  }
+
   public func backup() throws {
     for persistentStore in persistentStoreCoordinator.persistentStores {
       if let persistentStoreFileName = persistentStore.URL?.lastPathComponent {
