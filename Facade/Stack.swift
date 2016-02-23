@@ -74,7 +74,6 @@ public class Stack {
   public lazy var mainManagedObjectContext: NSManagedObjectContext = {
     let mainManagedObjectContext = self.createManagedObjectContext(.MainQueueConcurrencyType)
     mainManagedObjectContext.parentContext = self.rootManagedObjectContext
-    mainManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     return mainManagedObjectContext
   }()
   
