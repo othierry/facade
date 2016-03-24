@@ -26,7 +26,7 @@ public extension NSManagedObject {
   public class var entityDescription : NSEntityDescription {
     return NSEntityDescription.entityForName(
       entityName,
-      inManagedObjectContext: Facade.stack.mainManagedObjectContext)!
+      inManagedObjectContext: Stack.sharedInstance.mainManagedObjectContext)!
   }
 
   /// Creates a new Object of type A and insert it to the given managedObjectContext
@@ -34,7 +34,7 @@ public extension NSManagedObject {
   ///
   /// :param inManagedObjectContext The context in which the object should be inserted (optional)
   /// :return A new instance of the ManagedObject
-  class func create(inManagedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) -> Self {
+  class func create(inManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext) -> Self {
     return createAutoTyped(inManagedObjectContext)
   }
 
@@ -66,7 +66,7 @@ public extension NSManagedObject {
   }
 
   private class func createAutoTyped<A: NSManagedObject>(
-    inManagedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext) -> A
+    inManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext) -> A
   {
     let object = NSEntityDescription.insertNewObjectForEntityForName(
       entityName,

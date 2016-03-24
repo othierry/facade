@@ -73,9 +73,13 @@ public class Query<A: NSManagedObject> {
   /// :param entity the entity description the request should be attached to
   /// :param managedObjectContext the managedObjectContext the request should be executed against
   required public init() {
-    managedObjectContext = Facade.stack.mainManagedObjectContext
+    managedObjectContext = Stack.sharedInstance.mainManagedObjectContext
     fetchRequest = NSFetchRequest(entityName: A.entityDescription.name!)
     predicates = []
+  }
+
+  convenience public init(_ type: A.Type) {
+    self.init()
   }
 
   public class func or(queries: [Query<A>]) -> Query<A> {
@@ -92,7 +96,7 @@ public class Query<A: NSManagedObject> {
   
   /// Shortcut accessor to execute the query as A?
   public func first() -> A? {
-    if let primaryKey = Facade.stack.config.modelPrimaryKey {
+    if let primaryKey = Stack.Config.sharedConfig.modelPrimaryKey {
       sort("\(primaryKey) ASC")
     }
     return limit(1).execute()
@@ -100,7 +104,7 @@ public class Query<A: NSManagedObject> {
 
   /// Shortcut accessor to execute the query as A?
   public func last() -> A? {
-    if let primaryKey = Facade.stack.config.modelPrimaryKey {
+    if let primaryKey = Stack.Config.sharedConfig.modelPrimaryKey {
       sort("\(primaryKey) DESC")
     }
     return limit(1).execute()

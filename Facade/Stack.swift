@@ -11,16 +11,18 @@ import CoreData
 
 public class Stack {
   
+  public static let sharedInstance = Stack()
+  
   public class Config {
-    public var modelName: String?
-    public var seedName: String?
-    public var storeName: String? = NSBundle.mainBundle().bundleIdentifier
+    public static let sharedConfig = Config()
+    
+    public var modelURL: NSURL!
+    public var storeName: String! = NSBundle.mainBundle().bundleIdentifier
     public var storeType: String = NSSQLiteStoreType
+    public var seedURL: NSURL?
     public var modelPrimaryKey: String?
     public var options: [NSObject : AnyObject] = [:]
   }
-  
-  public private(set) var config = Config()
  
   private var managedObjectContexts: [String: NSManagedObjectContext] = [:]
 
@@ -54,12 +56,11 @@ public class Stack {
   }()
   
   public lazy var managedObjectModel: NSManagedObjectModel = {
-    if let modelName = self.config.modelName {
-      let modelURL = NSBundle
-        .mainBundle()
-        .URLForResource(modelName, withExtension: "momd")!
+    if let modelURL = Config.sharedConfig.modelURL {
+      print("Loading model from \(modelURL)")
       return NSManagedObjectModel(contentsOfURL: modelURL)!
     } else {
+      print("Loading model by merging bundles []")
       return NSManagedObjectModel.mergedModelFromBundles(nil)!
     }
   }()
@@ -113,7 +114,7 @@ extension Stack {
   
   public func registerChildContextWithIdentifier(
     identifier: String,
-    parentManagedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext,
+    parentManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext,
     concurrencyType: NSManagedObjectContextConcurrencyType = .PrivateQueueConcurrencyType) -> NSManagedObjectContext
   {
     if let managedObjectContext = managedObjectContexts[identifier] {
@@ -176,7 +177,7 @@ extension Stack {
 extension Stack {
   
   public func commit(
-    managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext,
+    managedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext,
     withCompletionHandler completionHandler: (NSError? -> Void)?)
   {
     let complete = { error in
@@ -202,14 +203,14 @@ extension Stack {
           parentManagedObjectContext,
           withCompletionHandler: completionHandler)
       } catch let error as NSError {
-        print("[Facade.stack.commit] Error saving context \(managedObjectContext). Error: \(error)")
+        print("[Stack.sharedInstance.commit] Error saving context \(managedObjectContext). Error: \(error)")
         complete(error)
       }
     }
   }
   
   public func commitSync(
-    managedObjectContext: NSManagedObjectContext = Facade.stack.mainManagedObjectContext)
+    managedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext)
   {
     managedObjectContext.performBlockAndWait {
       guard
@@ -226,7 +227,7 @@ extension Stack {
           self.commitSync(parentManagedObjectContext)
         }
       } catch let error as NSError {
-        print("[Facade.stack.commitSync] Error saving context \(managedObjectContext). Error: \(error)")
+        print("[Stack.sharedInstance.commitSync] Error saving context \(managedObjectContext). Error: \(error)")
       }
     }
   }
@@ -308,7 +309,7 @@ extension Stack {
 
   public var installed: Bool {
     let storePath = applicationDocumentsDirectory
-      .URLByAppendingPathComponent("\(config.storeName!).sqlite")
+      .URLByAppendingPathComponent("\(Config.sharedConfig.storeName!).sqlite")
       .path!
     
     return NSFileManager
@@ -318,14 +319,14 @@ extension Stack {
 
   public func connect() throws {
     let storeURL = self.applicationDocumentsDirectory
-      .URLByAppendingPathComponent(self.config.storeName!)
+      .URLByAppendingPathComponent(Config.sharedConfig.storeName!)
       .URLByAppendingPathExtension("sqlite")
     
     try persistentStoreCoordinator.addPersistentStoreWithType(
-      self.config.storeType,
+      Config.sharedConfig.storeType,
       configuration: nil,
       URL: storeURL,
-      options: self.config.options)
+      options: Config.sharedConfig.options)
   }
 
   public func backup() throws {
@@ -355,7 +356,7 @@ extension Stack {
     
     for fileExtension in ["sqlite", "sqlite-shm", "sqlite-wal"] {
       let filePath = applicationDocumentsDirectory
-        .URLByAppendingPathComponent("\(config.storeName!).\(fileExtension)")
+        .URLByAppendingPathComponent("\(Config.sharedConfig.storeName!).\(fileExtension)")
         .path!
       
       if fileManager.fileExistsAtPath(filePath) {
@@ -368,23 +369,16 @@ extension Stack {
   }
   
   public func seed() throws {
-    guard let storeName = config.storeName else {
+    guard let storeName = Config.sharedConfig.storeName else {
       throw NSError(
-        domain: "Store file name not defined. Use Facade.stack.config.seedName to define seed file",
+        domain: "Store file name not defined. Use Stack.sharedInstance.config.seedName to define seed file",
         code: 1000,
         userInfo: nil)
     }
 
-    guard let seedName = config.seedName else {
+    guard let seedURL = Config.sharedConfig.seedURL else {
       throw NSError(
-        domain: "Seed file name not defined. Use Facade.stack.config.seedName to define seed file",
-        code: 1000,
-        userInfo: nil)
-    }
-    
-    guard let seedURL = NSBundle.mainBundle().URLForResource(seedName, withExtension: "sqlite") else {
-      throw NSError(
-        domain: "Seed file not found: \(seedName)",
+        domain: "Seed file not found: \(Config.sharedConfig.seedURL)",
         code: 1000,
         userInfo: nil)
     }

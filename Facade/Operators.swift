@@ -37,14 +37,14 @@ infix operator </> {}
  
  */
 public func <=>(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
-  return Facade.stack.registerChildContextWithIdentifier(
+  return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
     concurrencyType: .MainQueueConcurrencyType)
 }
 
 public func <=>(left: Stack, right: String) -> NSManagedObjectContext {
-  return Facade.stack.registerChildContextWithIdentifier(
+  return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left.mainManagedObjectContext,
     concurrencyType: .MainQueueConcurrencyType)
@@ -70,14 +70,14 @@ public func <=>(left: Stack, right: String) -> NSManagedObjectContext {
  
  */
 public func <->(left: NSManagedObjectContext, right: String) -> NSManagedObjectContext {
-  return Facade.stack.registerChildContextWithIdentifier(
+  return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
     concurrencyType: .PrivateQueueConcurrencyType)
 }
 
 public func <->(left: Stack, right: String) -> NSManagedObjectContext {
-  return Facade.stack.registerChildContextWithIdentifier(
+  return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left.mainManagedObjectContext,
     concurrencyType: .PrivateQueueConcurrencyType)
