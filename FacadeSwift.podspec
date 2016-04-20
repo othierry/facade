@@ -13,7 +13,7 @@ Pod::Spec.new do |s|
   s.homepage         = "https://github.com/othierry/facade"
   s.license          = 'MIT'
   s.author           = { "Olivier Thierry" => "olivier.thierry42@gmail.com" }
-  s.source           = { :git => "https://github.com/othierry/future.git", :tag => s.version.to_s }
+  s.source           = { :git => "https://github.com/othierry/facade.git", :tag => s.version.to_s }
 
   s.platform = :ios, '9.0'
   s.requires_arc = true
