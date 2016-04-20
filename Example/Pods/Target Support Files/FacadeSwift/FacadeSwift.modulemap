@@ -1,0 +1,6 @@
+framework module Facade {
+  umbrella header "FacadeSwift-umbrella.h"
+
+  export *
+  module * { export * }
+}
