@@ -274,31 +274,21 @@ extension Stack {
 
     guard
       savedManagedObjectContext == self.rootManagedObjectContext
-      else { return }
+      else
+    {
+      // Write to disk
+      print("[Facade] Write to disk...")
+      commit(self.rootManagedObjectContext, withCompletionHandler: nil)
+      return
+    }
 
     // Independent context
     for independentManagedObjectContext in independentManagedObjectContexts {
       independentManagedObjectContext.performBlock {
-        // NSManagedObjectContext's merge routine ignores updated objects which aren't
-        // currently faulted in. To force it to notify interested clients that such
-        // objects have been refreshed (e.g. NSFetchedResultsController) we need to
-        // force them to be faulted in ahead of the merge
-        // SEE: http://mikeabdullah.net/merging-saved-changes-betwe.html
-        if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
-          for updatedObject in updatedObjects {
-            let _ = try? independentManagedObjectContext.existingObjectWithID(updatedObject.objectID)
-          }
-        }
-
         independentManagedObjectContext
           .mergeChangesFromContextDidSaveNotification(notification)
       }
     }
-
-    print("[Facade] Write to disk...")
-
-    // Write to disk
-    commit(self.rootManagedObjectContext, withCompletionHandler: nil)
   }
 
 }
