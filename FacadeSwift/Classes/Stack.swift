@@ -260,27 +260,24 @@ extension Stack {
         name: NSManagedObjectContextDidSaveNotification,
         object: managedObjectContext)
   }
-  
+
   @objc
   private func managedObjectContextDidSave(notification: NSNotification) {
     guard
       let savedManagedObjectContext = notification.object as? NSManagedObjectContext
       else { return }
-    
+
     // Break retain cycles and release memory
     // on the saved context
-    savedManagedObjectContext.performBlock {
-      savedManagedObjectContext.refreshAllObjects()
-    }
-    
+    savedManagedObjectContext.performBlock(
+      savedManagedObjectContext.refreshAllObjects)
+
     guard
-      savedManagedObjectContext.parentContext == self.rootManagedObjectContext
+      savedManagedObjectContext == self.rootManagedObjectContext
       else { return }
-    
+
     // Independent context
-    for independentManagedObjectContext in independentManagedObjectContexts
-      where independentManagedObjectContext != savedManagedObjectContext
-    {
+    for independentManagedObjectContext in independentManagedObjectContexts {
       independentManagedObjectContext.performBlock {
         // NSManagedObjectContext's merge routine ignores updated objects which aren't
         // currently faulted in. To force it to notify interested clients that such
@@ -292,19 +289,14 @@ extension Stack {
             let _ = try? independentManagedObjectContext.existingObjectWithID(updatedObject.objectID)
           }
         }
-        
-        // Merge changes on the idependent context
-        independentManagedObjectContext.mergeChangesFromContextDidSaveNotification(
-          notification)
-        
-        // Break retain cycles, release unnessecary memory
-        // after the merge occurs
-        independentManagedObjectContext.refreshAllObjects()
+
+        independentManagedObjectContext
+          .mergeChangesFromContextDidSaveNotification(notification)
       }
     }
-    
+
     print("[Facade] Write to disk...")
-    
+
     // Write to disk
     commit(self.rootManagedObjectContext, withCompletionHandler: nil)
   }
