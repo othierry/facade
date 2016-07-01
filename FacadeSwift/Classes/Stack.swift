@@ -267,27 +267,44 @@ extension Stack {
       else { return }
 
     // Break retain cycles and release memory
-    // on the saved context
-    savedManagedObjectContext.performBlock(
-      savedManagedObjectContext.refreshAllObjects)
+    savedManagedObjectContext.performBlock {
+      savedManagedObjectContext.refreshAllObjects()
+    }
 
     guard
-      savedManagedObjectContext == self.rootManagedObjectContext
-      else
-    {
-      // Write to disk
-      print("[Facade] Write to disk...")
-      commit(self.rootManagedObjectContext, withCompletionHandler: nil)
-      return
-    }
+      savedManagedObjectContext.parentContext == self.rootManagedObjectContext
+      else { return }
 
     // Independent context
-    for independentManagedObjectContext in independentManagedObjectContexts {
+    for independentManagedObjectContext in independentManagedObjectContexts
+      where independentManagedObjectContext != savedManagedObjectContext
+    {
       independentManagedObjectContext.performBlock {
-        independentManagedObjectContext
-          .mergeChangesFromContextDidSaveNotification(notification)
+        // NSManagedObjectContext's merge routine ignores updated objects which aren't
+        // currently faulted in. To force it to notify interested clients that such
+        // objects have been refreshed (e.g. NSFetchedResultsController) we need to
+        // force them to be faulted in ahead of the merge
+        // SEE: http://mikeabdullah.net/merging-saved-changes-betwe.html
+        if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
+          for updatedObject in updatedObjects {
+            let _ = try? independentManagedObjectContext.existingObjectWithID(updatedObject.objectID)
+          }
+        }
+
+        // Merge changes on the idependent context
+        independentManagedObjectContext.mergeChangesFromContextDidSaveNotification(
+          notification)
+
+        // Break retain cycles, release unnessecary memory
+        // after the merge occurs
+        independentManagedObjectContext.refreshAllObjects()
       }
     }
+
+    print("[Facade] Write to disk...")
+
+    // Write to disk
+    commit(self.rootManagedObjectContext, withCompletionHandler: nil)
   }
 
 }
