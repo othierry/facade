@@ -154,18 +154,17 @@ extension Stack {
     guard let managedObjectContext = managedObjectContexts[identifier] else {
       return
     }
-    
-    unregisterForManagedObjectContextNotifications(managedObjectContext)
-    
+
     managedObjectContext.performBlock {
       managedObjectContext.reset()
+      self.unregisterForManagedObjectContextNotifications(managedObjectContext)
     }
-    
+
     // managedObjectContext is retained by performBlock's block
     // so we can remove it now
     self.managedObjectContexts.removeValueForKey(identifier)
   }
-  
+
   public func identifierForContext(managedObjectContext: NSManagedObjectContext) -> String? {
     for (identifier, context) in managedObjectContexts {
       if context === managedObjectContext {
