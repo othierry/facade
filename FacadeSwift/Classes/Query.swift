@@ -72,23 +72,19 @@ public class Query<A: NSManagedObject> {
   ///
   /// :param entity the entity description the request should be attached to
   /// :param managedObjectContext the managedObjectContext the request should be executed against
-  required public init() {
+  required public init(_ type: A.Type) {
     managedObjectContext = Stack.sharedInstance.mainManagedObjectContext
-    fetchRequest = NSFetchRequest(entityName: A.entityDescription.name!)
+    fetchRequest = NSFetchRequest(entityName: type.entityDescription.name!)
     predicates = []
-  }
-
-  convenience public init(_ type: A.Type) {
-    self.init()
   }
 
   public class func or(queries: [Query<A>]) -> Query<A> {
     let predicates = queries.map { NSCompoundPredicate(andPredicateWithSubpredicates: $0.predicates) }
-    let query = Query<A>()
+    let query = Query(A)
     query.predicates = [NSCompoundPredicate(orPredicateWithSubpredicates: predicates)]
     return query
   }
-  
+
   /// Shortcut accessor to execute the query as [A]
   public func all() -> [A] {
     return execute()
