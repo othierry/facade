@@ -92,7 +92,7 @@ public class Query<A: NSManagedObject> {
   
   /// Shortcut accessor to execute the query as A?
   public func first() -> A? {
-    if let primaryKey = Stack.Config.sharedConfig.modelPrimaryKey {
+    if let primaryKey = facade_stack.config.modelPrimaryKey {
       sort("\(primaryKey) ASC")
     }
     return limit(1).execute()
@@ -100,7 +100,7 @@ public class Query<A: NSManagedObject> {
 
   /// Shortcut accessor to execute the query as A?
   public func last() -> A? {
-    if let primaryKey = Stack.Config.sharedConfig.modelPrimaryKey {
+    if let primaryKey = facade_stack.config.modelPrimaryKey {
       sort("\(primaryKey) DESC")
     }
     return limit(1).execute()
@@ -622,4 +622,12 @@ public class Query<A: NSManagedObject> {
     print("Error executing fetchRequest: \(fetchRequest). Error: \(error)")
     return true
   }
+}
+
+public func facade_query<A: NSManagedObject>(type: A.Type) -> Query<A> {
+  return Query(type)
+}
+
+public func facade_queryOr<A: NSManagedObject>(queries: [Query<A>]) -> Query<A> {
+  return Query.or(queries)
 }

@@ -10,12 +10,8 @@ import Foundation
 import CoreData
 
 public class Stack {
-  
-  public static let sharedInstance = Stack()
-  
+
   public class Config {
-    public static let sharedConfig = Config()
-    
     public var modelURL: NSURL!
     public var storeName: String! = NSBundle.mainBundle().bundleIdentifier
     public var storeType: String = NSSQLiteStoreType
@@ -23,6 +19,10 @@ public class Stack {
     public var modelPrimaryKey: String?
     public var options: [NSObject : AnyObject] = [:]
   }
+
+  public static let sharedInstance = Stack()
+
+  public var config: Config = Config()
  
   private var managedObjectContexts: [String: NSManagedObjectContext] = [:]
 
@@ -56,7 +56,7 @@ public class Stack {
   }()
   
   public lazy var managedObjectModel: NSManagedObjectModel = {
-    if let modelURL = Config.sharedConfig.modelURL {
+    if let modelURL = self.config.modelURL {
       print("Loading model from \(modelURL)")
       return NSManagedObjectModel(contentsOfURL: modelURL)!
     } else {
@@ -314,7 +314,7 @@ extension Stack {
 
   public var installed: Bool {
     let storePath = applicationDocumentsDirectory
-      .URLByAppendingPathComponent("\(Config.sharedConfig.storeName!).sqlite")
+      .URLByAppendingPathComponent("\(self.config.storeName!).sqlite")
       .path!
     
     return NSFileManager
@@ -324,14 +324,14 @@ extension Stack {
 
   public func connect() throws {
     let storeURL = self.applicationDocumentsDirectory
-      .URLByAppendingPathComponent(Config.sharedConfig.storeName!)
+      .URLByAppendingPathComponent(self.config.storeName!)
       .URLByAppendingPathExtension("sqlite")
     
     try persistentStoreCoordinator.addPersistentStoreWithType(
-      Config.sharedConfig.storeType,
+      self.config.storeType,
       configuration: nil,
       URL: storeURL,
-      options: Config.sharedConfig.options)
+      options: self.config.options)
   }
 
   public func backup() throws {
@@ -361,7 +361,7 @@ extension Stack {
     
     for fileExtension in ["sqlite", "sqlite-shm", "sqlite-wal"] {
       let filePath = applicationDocumentsDirectory
-        .URLByAppendingPathComponent("\(Config.sharedConfig.storeName!).\(fileExtension)")
+        .URLByAppendingPathComponent("\(self.config.storeName!).\(fileExtension)")
         .path!
       
       if fileManager.fileExistsAtPath(filePath) {
@@ -374,16 +374,16 @@ extension Stack {
   }
   
   public func seed() throws {
-    guard let storeName = Config.sharedConfig.storeName else {
+    guard let storeName = self.config.storeName else {
       throw NSError(
         domain: "Store file name not defined. Use Stack.sharedInstance.config.seedName to define seed file",
         code: 1000,
         userInfo: nil)
     }
 
-    guard let seedURL = Config.sharedConfig.seedURL else {
+    guard let seedURL = self.config.seedURL else {
       throw NSError(
-        domain: "Seed file not found: \(Config.sharedConfig.seedURL)",
+        domain: "Seed file not found: \(self.config.seedURL)",
         code: 1000,
         userInfo: nil)
     }
@@ -402,4 +402,8 @@ extension Stack {
     print("Database successfuly seeded.")
   }
 
+}
+
+public var facade_stack: Facade.Stack {
+  return Stack.sharedInstance
 }
