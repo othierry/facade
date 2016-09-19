@@ -42,8 +42,8 @@ open class ElasticQuery<A: NSManagedObject> {
   
   open func loadMore() -> [A] {
     if canLoadMore {
-      query.limit(batchSize)
-      query.offset(results.count)
+      _ = query.limit(batchSize)
+      _ = query.offset(results.count)
       let batch = query.execute() as [A]
       results += batch
       return batch
@@ -64,7 +64,7 @@ open class ElasticQuery<A: NSManagedObject> {
 open class Query<A: NSManagedObject> {
   
   open fileprivate(set) var managedObjectContext : NSManagedObjectContext
-  open fileprivate(set) var fetchRequest : NSFetchRequest<AnyObject>
+  open fileprivate(set) var fetchRequest : NSFetchRequest<A>
 
   internal var predicates: [NSPredicate]
   
@@ -80,7 +80,7 @@ open class Query<A: NSManagedObject> {
 
   open class func or(_ queries: [Query<A>]) -> Query<A> {
     let predicates = queries.map { NSCompoundPredicate(andPredicateWithSubpredicates: $0.predicates) }
-    let query = Query(A)
+    let query = Query(A.self)
     query.predicates = [NSCompoundPredicate(orPredicateWithSubpredicates: predicates)]
     return query
   }
@@ -93,7 +93,7 @@ open class Query<A: NSManagedObject> {
   /// Shortcut accessor to execute the query as A?
   open func first() -> A? {
     if let primaryKey = facade_stack.config.modelPrimaryKey {
-      sort("\(primaryKey) ASC")
+      _ = sort("\(primaryKey) ASC")
     }
     return limit(1).execute()
   }
@@ -101,7 +101,7 @@ open class Query<A: NSManagedObject> {
   /// Shortcut accessor to execute the query as A?
   open func last() -> A? {
     if let primaryKey = facade_stack.config.modelPrimaryKey {
-      sort("\(primaryKey) DESC")
+      _ = sort("\(primaryKey) DESC")
     }
     return limit(1).execute()
   }
@@ -116,7 +116,7 @@ open class Query<A: NSManagedObject> {
   open func distinct(_ on: String? = nil) -> Self {
     fetchRequest.returnsDistinctResults = true
     if let on = on {
-      fetch([on as AnyObject])
+      _ = fetch([on as AnyObject])
     }
     return self
   }
@@ -171,10 +171,10 @@ open class Query<A: NSManagedObject> {
   
   open func toFetchedResultsController(
     sectionNameKeyPath: String? = nil,
-    cacheName: String? = nil) -> NSFetchedResultsController<AnyObject>
+    cacheName: String? = nil) -> NSFetchedResultsController<A>
   {
     setPredicate()
-    
+  
     return NSFetchedResultsController(
       fetchRequest: self.fetchRequest,
       managedObjectContext: self.managedObjectContext,
@@ -384,10 +384,11 @@ open class Query<A: NSManagedObject> {
     }
 
     let modifier = modifierFor(options)
+    
     predicates.append(
       NSPredicate(
         format: "\(key) !=\(modifier) %@",
-        argumentArray: [ ??"NIL"]))
+        argumentArray: [value]))
     return self
   }
 
@@ -503,16 +504,19 @@ open class Query<A: NSManagedObject> {
     
     fetchRequest.includesSubentities = false
     
-    var error: NSError?
+    //let error: NSError?
     var count: Int!
    
-    managedObjectContext.performAndWait {
-      count = self.managedObjectContext.count(
-        for: self.fetchRequest,
-        error: &error)
-    }
     
-    shouldHandleError(error)
+    managedObjectContext.performAndWait {
+      do {
+      count = try self.managedObjectContext.count(
+        for: self.fetchRequest)
+        
+      }catch let error as NSError {
+        _ = self.shouldHandleError(error)
+      }
+    }
     return count
   }
 
@@ -532,8 +536,7 @@ open class Query<A: NSManagedObject> {
   @available(iOS 9.0, *)
   open func batchDelete() {
     setPredicate()
-
-    let batchRequest = NSBatchDeleteRequest(fetchRequest: self.fetchRequest)
+    let batchRequest = NSBatchDeleteRequest(fetchRequest: self.fetchRequest as! NSFetchRequest<NSFetchRequestResult>)
     
     managedObjectContext.performAndWait {
       do {
