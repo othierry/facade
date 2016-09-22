@@ -503,16 +503,15 @@ public class Query<A: NSManagedObject> {
     
     fetchRequest.includesSubentities = false
     
-    var error: NSError?
     var count: Int!
    
     managedObjectContext.performBlockAndWait {
-      count = self.managedObjectContext.countForFetchRequest(
-        self.fetchRequest,
-        error: &error)
+      do {
+      count = try self.managedObjectContext.countForFetchRequest(
+        self.fetchRequest)
+      } catch let error as NSError { self.shouldHandleError(error) }
     }
     
-    shouldHandleError(error)
     return count
   }
 

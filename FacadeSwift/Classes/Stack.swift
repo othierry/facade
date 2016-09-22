@@ -90,18 +90,18 @@ public class Stack {
       .URLByAppendingPathComponent("facade:backup")
     
     guard
-      !NSFileManager.defaultManager().fileExistsAtPath(backupDirectory.path!)
-      else { return backupDirectory }
+      !NSFileManager.defaultManager().fileExistsAtPath(backupDirectory!.path!)
+      else { return backupDirectory! }
     
     // Create backup directory
     try! NSFileManager
       .defaultManager()
       .createDirectoryAtURL(
-        backupDirectory,
+        backupDirectory!,
         withIntermediateDirectories: true,
         attributes: nil)
     
-    return backupDirectory
+    return backupDirectory!
   }()
 }
 
@@ -314,7 +314,7 @@ extension Stack {
 
   public var installed: Bool {
     let storePath = applicationDocumentsDirectory
-      .URLByAppendingPathComponent("\(self.config.storeName!).sqlite")
+      .URLByAppendingPathComponent("\(self.config.storeName!).sqlite")!
       .path!
     
     return NSFileManager
@@ -324,7 +324,7 @@ extension Stack {
 
   public func connect() throws {
     let storeURL = self.applicationDocumentsDirectory
-      .URLByAppendingPathComponent(self.config.storeName!)
+      .URLByAppendingPathComponent(self.config.storeName!)!
       .URLByAppendingPathExtension("sqlite")
     
     try persistentStoreCoordinator.addPersistentStoreWithType(
@@ -344,7 +344,7 @@ extension Stack {
         
         try persistentStoreCoordinator.migratePersistentStore(
           persistentStore,
-          toURL: storeBackupUrl,
+          toURL: storeBackupUrl!,
           options: [
             NSSQLitePragmasOption: ["journal_mode": "DELETE"],
             NSSQLiteManualVacuumOption: true
@@ -361,7 +361,7 @@ extension Stack {
     
     for fileExtension in ["sqlite", "sqlite-shm", "sqlite-wal"] {
       let filePath = applicationDocumentsDirectory
-        .URLByAppendingPathComponent("\(self.config.storeName!).\(fileExtension)")
+        .URLByAppendingPathComponent("\(self.config.storeName!).\(fileExtension)")!
         .path!
       
       if fileManager.fileExistsAtPath(filePath) {
@@ -397,7 +397,7 @@ extension Stack {
       .defaultManager()
       .copyItemAtURL(
         seedURL,
-        toURL: destinationURL)
+        toURL: destinationURL!)
     
     print("Database successfuly seeded.")
   }
