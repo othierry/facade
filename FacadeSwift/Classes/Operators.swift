@@ -9,13 +9,18 @@
 import Foundation
 import CoreData
 
+precedencegroup FacadeAssociateRight {
+  associativity: right
+  lowerThan: CastingPrecedence
+}
+
 // Common
-infix operator <- { associativity right }
+infix operator << : { associativity right precedence 200}
 
 // child contexts
-infix operator <=> {}
-infix operator <-> {}
-infix operator </> {}
+infix operator <=>
+infix operator <->
+infix operator </>
 
 /**
  Register a new child context with `.MainQueueConcurrencyType`
@@ -40,14 +45,14 @@ public func <=>(left: NSManagedObjectContext, right: String) -> NSManagedObjectC
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
-    concurrencyType: .MainQueueConcurrencyType)
+    concurrencyType: .mainQueueConcurrencyType)
 }
 
 public func <=>(left: Stack, right: String) -> NSManagedObjectContext {
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left.mainManagedObjectContext,
-    concurrencyType: .MainQueueConcurrencyType)
+    concurrencyType: .mainQueueConcurrencyType)
 }
 
 /**
@@ -73,14 +78,14 @@ public func <->(left: NSManagedObjectContext, right: String) -> NSManagedObjectC
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
-    concurrencyType: .PrivateQueueConcurrencyType)
+    concurrencyType: .privateQueueConcurrencyType)
 }
 
 public func <->(left: Stack, right: String) -> NSManagedObjectContext {
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left.mainManagedObjectContext,
-    concurrencyType: .PrivateQueueConcurrencyType)
+    concurrencyType: .privateQueueConcurrencyType)
 }
 
 
@@ -121,10 +126,28 @@ public func </>(left: Stack, right: String) {
 
   SeeAlso NSManagedObject.objectWithID(_:NSManagedObjectID)
 */
-public func <-<A: NSManagedObject>(left: NSManagedObjectContext, right: A) -> A! {
+/*public func retriveObject<A: NSManagedObject>(ofType type: A, inManagedObjectContext managedObjectContext: NSManagedObjectContext) -> A! {
   var object: A!
-  left.performBlockAndWait {
-    object = left.objectWithID(right.objectID) as! A
+  managedObjectContext.performAndWait {
+    object = managedObjectContext.object(with: type.objectID) as! A
   }
   return object
 }
+*/
+extension NSManagedObject {
+ 
+  public func `in` (context: NSManagedObjectContext) -> NSManagedObject {
+    var object: NSManagedObject!
+    context.performAndWait {
+      object = context.object(with: self.objectID)
+    }
+    return object
+  }
+}
+
+public func << (left: NSManagedObjectContext, right: NSManagedObject) -> NSManagedObject {
+  return right.in(context: left)
+}
+
+
+
