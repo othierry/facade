@@ -40,14 +40,18 @@ public class Stack {
   }
 
   public init() {
-    registerForManagedObjectContextNotifications(mainManagedObjectContext)
-    registerForManagedObjectContextNotifications(rootManagedObjectContext)
+   
   }
   
   deinit {
     unregisterForManagedObjectContextNotifications()
   }
 
+  public func initialize() {
+    registerForManagedObjectContextNotifications(mainManagedObjectContext)
+    registerForManagedObjectContextNotifications(rootManagedObjectContext)
+  }
+  
   public lazy var persistentStoreCoordinator: NSPersistentStoreCoordinator = {
     let persistentStoreCoordinator = NSPersistentStoreCoordinator(
       managedObjectModel: self.managedObjectModel)
