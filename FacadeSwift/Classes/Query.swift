@@ -507,9 +507,10 @@ public class Query<A: NSManagedObject> {
    
     managedObjectContext.performBlockAndWait {
       do {
-      count = try self.managedObjectContext.countForFetchRequest(
-        self.fetchRequest)
-      } catch let error as NSError { self.shouldHandleError(error) }
+        count = try self.managedObjectContext.countForFetchRequest(self.fetchRequest)
+      } catch let error as NSError {
+        self.shouldHandleError(error)
+      }
     }
     
     return count
