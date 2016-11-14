@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = "FacadeSwift"
-  s.version          = "0.1.0"
+  s.version          = "0.1.1"
   s.summary          = "CoreData made sexy with swift"
   s.homepage         = "https://github.com/othierry/facade"
   s.license          = 'MIT'
