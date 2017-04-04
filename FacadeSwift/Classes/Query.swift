@@ -9,7 +9,7 @@
 import Foundation
 import CoreData
 
-public struct QueryOptions: OptionSetType, BooleanType {
+public struct QueryOptions: OptionSet {
 
   public let rawValue: UInt
 
@@ -21,8 +21,8 @@ public struct QueryOptions: OptionSetType, BooleanType {
     return rawValue != 0
   }
 
-  public func has(options: QueryOptions) -> Bool {
-    return self.intersect(options) == options
+  public func has(_ options: QueryOptions) -> Bool {
+    return self.intersection(options) == options
   }
   
   public static let None = QueryOptions(rawValue: 0)
@@ -31,16 +31,16 @@ public struct QueryOptions: OptionSetType, BooleanType {
   
 }
 
-public class ElasticQuery<A: NSManagedObject> {
-  public private(set) var query: Query<A>
-  public var batchSize: Int = 100
-  public var results: [A] = []
+open class ElasticQuery<A: NSManagedObject> {
+  open fileprivate(set) var query: Query<A>
+  open var batchSize: Int = 100
+  open var results: [A] = []
   
   public required init(query: Query<A>) {
     self.query = query
   }
   
-  public func loadMore() -> [A] {
+  open func loadMore() -> [A] {
     if canLoadMore {
       query.limit(batchSize)
       query.offset(results.count)
@@ -52,19 +52,19 @@ public class ElasticQuery<A: NSManagedObject> {
     }
   }
   
-  public var canLoadMore: Bool {
+  open var canLoadMore: Bool {
     return totalNumberOfResults > results.count
   }
   
-  public lazy var totalNumberOfResults: Int = {
+  open lazy var totalNumberOfResults: Int = {
     return self.query.count()
     }()
 }
 
-public class Query<A: NSManagedObject> {
+open class Query<A: NSManagedObject> {
   
-  public private(set) var managedObjectContext : NSManagedObjectContext
-  public private(set) var fetchRequest : NSFetchRequest
+  open fileprivate(set) var managedObjectContext : NSManagedObjectContext
+  open fileprivate(set) var fetchRequest : NSFetchRequest<A>
 
   internal var predicates: [NSPredicate]
   
@@ -78,20 +78,20 @@ public class Query<A: NSManagedObject> {
     predicates = []
   }
 
-  public class func or(queries: [Query<A>]) -> Query<A> {
+  open class func or(_ queries: [Query<A>]) -> Query<A> {
     let predicates = queries.map { NSCompoundPredicate(andPredicateWithSubpredicates: $0.predicates) }
-    let query = Query(A)
+    let query = Query(A.self)
     query.predicates = [NSCompoundPredicate(orPredicateWithSubpredicates: predicates)]
     return query
   }
 
   /// Shortcut accessor to execute the query as [A]
-  public func all() -> [A] {
+  open func all() -> [A] {
     return execute()
   }
   
   /// Shortcut accessor to execute the query as A?
-  public func first() -> A? {
+  open func first() -> A? {
     if let primaryKey = facade_stack.config.modelPrimaryKey {
       sort("\(primaryKey) ASC")
     }
@@ -99,79 +99,89 @@ public class Query<A: NSManagedObject> {
   }
 
   /// Shortcut accessor to execute the query as A?
-  public func last() -> A? {
+  open func last() -> A? {
     if let primaryKey = facade_stack.config.modelPrimaryKey {
       sort("\(primaryKey) DESC")
     }
     return limit(1).execute()
   }
   
-  public func elastic() -> ElasticQuery<A> {
+  open func elastic() -> ElasticQuery<A> {
     return ElasticQuery(query: self)
   }
 
   /// If set to true, uniq values will be returned from the store
   /// NOTE: if set to true, the query must be executed as Dictionnary
   /// result type
-  public func distinct(on: String? = nil) -> Self {
+  @discardableResult
+  open func distinct(_ on: String? = nil) -> Self {
     fetchRequest.returnsDistinctResults = true
     if let on = on {
-      fetch([on])
+      fetch([on] as [AnyObject])
     }
     return self
   }
   
   /// Use this property to set the limit of the number of objects to fetch
-  public func limit(x: Int) -> Self {
+  @discardableResult
+  open func limit(_ x: Int) -> Self {
     fetchRequest.fetchLimit = x
     return self
   }
   
-  public func offset(x: Int) -> Self {
+  @discardableResult
+  open func offset(_ x: Int) -> Self {
     fetchRequest.fetchOffset = x
     return self
   }
   
-  public func fetchBatchSize(x: Int) -> Self {
+  @discardableResult
+  open func fetchBatchSize(_ x: Int) -> Self {
     fetchRequest.fetchBatchSize = x
     return self
   }
   
-  public func prefetch(relations: [String]) -> Self {
+  @discardableResult
+  open func prefetch(_ relations: [String]) -> Self {
     fetchRequest.relationshipKeyPathsForPrefetching = relations
     return self
   }
   
-  public func faults(returnsFaults: Bool) -> Self {
+  @discardableResult
+  open func faults(_ returnsFaults: Bool) -> Self {
     fetchRequest.returnsObjectsAsFaults = returnsFaults
     return self
   }
   
-  public func refresh(refreshRefetchedObjects: Bool) -> Self {
+  @discardableResult
+  open func refresh(_ refreshRefetchedObjects: Bool) -> Self {
     fetchRequest.shouldRefreshRefetchedObjects = refreshRefetchedObjects
     return self
   }
   
-  public func groupBy(properties: [AnyObject]) -> Self {
+  @discardableResult
+  open func groupBy(_ properties: [AnyObject]) -> Self {
     fetchRequest.propertiesToGroupBy = properties
     return self
   }
   
   /// Use this property to restrict the properties of entity A to fetch
   /// from the store
-  public func fetch(properties: [AnyObject]) -> Self {
+  @discardableResult
+  open func fetch(_ properties: [AnyObject]) -> Self {
     fetchRequest.propertiesToFetch = properties
     return self
   }
   
-  public func inManagedObjectContext(managedObjectContext: NSManagedObjectContext) -> Self {
+  @discardableResult
+  open func inManagedObjectContext(_ managedObjectContext: NSManagedObjectContext) -> Self {
     self.managedObjectContext = managedObjectContext
     return self
   }
   
-  public func toFetchedResultsController(
-    sectionNameKeyPath sectionNameKeyPath: String? = nil,
-    cacheName: String? = nil) -> NSFetchedResultsController
+  open func toFetchedResultsController(
+    sectionNameKeyPath: String? = nil,
+    cacheName: String? = nil) -> NSFetchedResultsController<A>
   {
     setPredicate()
     
@@ -187,9 +197,10 @@ public class Query<A: NSManagedObject> {
   /// - parameter sortStr: The string describing the sort order of the query results
   /// (e.g: "age ASC", "age", "age ASC, id DESC")
   /// :return self
-  public func sort(sortStr: String) -> Self {
-    let components = sortStr.componentsSeparatedByString(",").map {
-      component in component.componentsSeparatedByString(" ")
+  @discardableResult
+  open func sort(_ sortStr: String) -> Self {
+    let components = sortStr.components(separatedBy: ",").map {
+      component in component.components(separatedBy: " ")
     }
     
     fetchRequest.sortDescriptors = components.map { component in
@@ -210,7 +221,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter containedIn: the values to match againsts
   /// :return: self
-  public func with(key: String, containedIn objects: [AnyObject]) -> Self
+  open func with(_ key: String, containedIn objects: [AnyObject]) -> Self
   {
     predicates.append(
       NSPredicate(
@@ -224,7 +235,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter notContainedIn: the values to match againsts
   /// :return: self
-  public func with(key: String, notContainedIn objects: [AnyObject]) -> Self {
+  open func with(_ key: String, notContainedIn objects: [AnyObject]) -> Self {
     predicates.append(
       NSPredicate(
         format: "NOT (\(key) IN %@)",
@@ -239,7 +250,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, containing value: String, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, containing value: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
@@ -255,7 +266,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, like value: String, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, like value: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
@@ -269,7 +280,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter values: the values the entity's set/array must contain
   /// :return: self
-  public func with(key: String, containingAll values: [AnyObject]) -> Self {
+  open func with(_ key: String, containingAll values: [AnyObject]) -> Self {
     predicates.append(
       NSPredicate(
         format: "ALL \(key) IN %@",
@@ -282,7 +293,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter values: the values the entity's set/array must not contain
   /// :return: self
-  public func with(key: String, containingNone values: [AnyObject]) -> Self {
+  open func with(_ key: String, containingNone values: [AnyObject]) -> Self {
     predicates.append(
       NSPredicate(
         format: "NONE \(key) IN %@",
@@ -295,7 +306,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter values: the values the entity's set/array can contain
   /// :return: self
-  public func with(key: String, containingAny values: [AnyObject]) -> Self {
+  open func with(_ key: String, containingAny values: [AnyObject]) -> Self {
     predicates.append(
       NSPredicate(
         format: "ANY \(key) IN %@",
@@ -308,7 +319,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter exists: true if the key must exists, false otherwise
   /// :return: self
-  public func with(key: String, existing exists: Bool) -> Self {
+  open func with(_ key: String, existing exists: Bool) -> Self {
     let matcher = exists ? "!=" : "=="
     predicates.append(
       NSPredicate(
@@ -323,7 +334,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, endingWith suffix: String, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, endingWith suffix: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
@@ -339,7 +350,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, startingWith prefix: String, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, startingWith prefix: String, options: QueryOptions = .None) -> Self {
     let modifier = modifierFor(options)
     predicates.append(
       NSPredicate(
@@ -355,7 +366,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, equalTo value: AnyObject?, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, equalTo value: AnyObject?, options: QueryOptions = .None) -> Self {
     guard value != nil else {
       return with(key, existing: false)
     }
@@ -378,7 +389,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  public func with(key: String, notEqualTo value: AnyObject?, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, notEqualTo value: AnyObject?, options: QueryOptions = .None) -> Self {
     guard value != nil else {
       return with(key, existing: true)
     }
@@ -396,7 +407,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter greaterThan: the value
   /// :return: self
-  public func with(key: String, greaterThan value: Double) -> Self {
+  open func with(_ key: String, greaterThan value: Double) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) > %@",
@@ -409,7 +420,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter greaterThanOrEqual: the value
   /// :return: self
-  public func with(key: String, greaterThanOrEqual value: Double) -> Self {
+  open func with(_ key: String, greaterThanOrEqual value: Double) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) >= %@",
@@ -422,7 +433,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter greaterThan: the value
   /// :return: self
-  public func with(key: String, greaterThan value: Int) -> Self {
+  open func with(_ key: String, greaterThan value: Int) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) > %@",
@@ -435,7 +446,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter greaterThanOrEqual: the value
   /// :return: self
-  public func with(key: String, greaterThanOrEqual value: Int) -> Self {
+  open func with(_ key: String, greaterThanOrEqual value: Int) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) >= %@",
@@ -448,7 +459,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter lowerThan: the value
   /// :return: self
-  public func with(key: String, lowerThan value: Double) -> Self {
+  open func with(_ key: String, lowerThan value: Double) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) < %@",
@@ -461,7 +472,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter lowerThanOrEqual: the value
   /// :return: self
-  public func with(key: String, lowerThanOrEqual value: Double) -> Self {
+  open func with(_ key: String, lowerThanOrEqual value: Double) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) <= %@",
@@ -474,7 +485,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter lowerThan: the value
   /// :return: self
-  public func with(key: String, lowerThan value: Int) -> Self {
+  open func with(_ key: String, lowerThan value: Int) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) < %@",
@@ -487,7 +498,7 @@ public class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter lowerThanOrEqual: the value
   /// :return: self
-  public func with(key: String, lowerThanOrEqual value: Int) -> Self {
+  open func with(_ key: String, lowerThanOrEqual value: Int) -> Self {
     predicates.append(
       NSPredicate(
         format: "\(key) <= %@",
@@ -498,16 +509,16 @@ public class Query<A: NSManagedObject> {
   /// Execute the fetch request as a count operation
   /// 
   /// :return: the number of objects matching against query
-  public func count() -> Int {
+  open func count() -> Int {
     setPredicate()
     
     fetchRequest.includesSubentities = false
     
     var count: Int!
    
-    managedObjectContext.performBlockAndWait {
+    managedObjectContext.performAndWait {
       do {
-        count = try self.managedObjectContext.countForFetchRequest(self.fetchRequest)
+        count = try self.managedObjectContext.count(for: self.fetchRequest)
       } catch let error as NSError {
         self.shouldHandleError(error)
       }
@@ -516,28 +527,30 @@ public class Query<A: NSManagedObject> {
     return count
   }
 
-  public func delete() {
+  open func delete() {
     setPredicate()
     
     // We do not need to load any values
     fetchRequest.includesPropertyValues = false
 
-    managedObjectContext.performBlockAndWait {
+    managedObjectContext.performAndWait {
       for object in self.execute() as [A] {
-        self.managedObjectContext.deleteObject(object)
+        self.managedObjectContext.delete(object)
       }
     }
   }
   
   @available(iOS 9.0, *)
-  public func batchDelete() {
+  open func batchDelete() {
     setPredicate()
 
-    let batchRequest = NSBatchDeleteRequest(fetchRequest: self.fetchRequest)
+    let batchRequest = NSBatchDeleteRequest(
+      fetchRequest: self.fetchRequest as! NSFetchRequest<NSFetchRequestResult>
+    )
     
-    managedObjectContext.performBlockAndWait {
+    managedObjectContext.performAndWait {
       do {
-        try self.managedObjectContext.executeRequest(batchRequest)
+        try self.managedObjectContext.execute(batchRequest)
       } catch let error as NSError {
         if self.shouldHandleError(error) {
           print("Error executing batch deleted request: \(batchRequest), fetchRequest: \(self.fetchRequest) Error: \(error)")
@@ -548,46 +561,46 @@ public class Query<A: NSManagedObject> {
   
   /// Execute the fetch request and return its first optional object
   /// :return: optional object
-  public func execute() -> A? {
+  open func execute() -> A? {
     return execute().first
   }
 
   /// Execute the fetch request and return its objects
   /// :return: [objects]
-  public func execute() -> [A] {
-    fetchRequest.resultType = .ManagedObjectResultType
+  open func execute() -> [A] {
+    fetchRequest.resultType = .managedObjectResultType
     return _execute() as! [A]
   }
 
   /// Execute the fetch request as Dictionnaries return type
   /// and return the first optional dictionnary
   /// :return: NSDictionary
-  public func execute() -> NSDictionary? {
+  open func execute() -> NSDictionary? {
     return execute().first
   }
 
   /// Execute the fetch request as Dictionnaries return type
   /// :return: [NSDictionary]
-  public func execute() -> [NSDictionary] {
-    fetchRequest.resultType = .DictionaryResultType
+  open func execute() -> [NSDictionary] {
+    fetchRequest.resultType = .dictionaryResultType
     return _execute() as! [NSDictionary]
   }
 
   /// Execute the fetch request as NSManagedObjectID return type
   /// :return: [NSManagedObjectID]
-  public func execute() -> [NSManagedObjectID] {
-    fetchRequest.resultType = .ManagedObjectIDResultType
+  open func execute() -> [NSManagedObjectID] {
+    fetchRequest.resultType = .managedObjectIDResultType
     return _execute() as! [NSManagedObjectID]
   }
 
-  private func _execute() -> [AnyObject]? {
+  fileprivate func _execute() -> [AnyObject]? {
     setPredicate()
     
     var objects: [AnyObject]?
     
-    managedObjectContext.performBlockAndWait {
+    managedObjectContext.performAndWait {
       do {
-        objects = try self.managedObjectContext.executeFetchRequest(
+        objects = try self.managedObjectContext.fetch(
           self.fetchRequest)
       } catch let error as NSError {
         if self.shouldHandleError(error) {
@@ -600,7 +613,7 @@ public class Query<A: NSManagedObject> {
     return objects
   }
   
-  private func setPredicate() {
+  fileprivate func setPredicate() {
     if !predicates.isEmpty {
       fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
     } else {
@@ -608,26 +621,27 @@ public class Query<A: NSManagedObject> {
     }
   }
   
-  private func modifierFor(options: QueryOptions) -> String {
+  fileprivate func modifierFor(_ options: QueryOptions) -> String {
     let modifiers = [(options.has(.CaseInsensitive), "c"), (options.has(.DiacriticInsensitive), "d")]
-    let activeModifiers = modifiers.filter { $0.0 }.map { $0.1 }.joinWithSeparator("")
+    let activeModifiers = modifiers.filter { $0.0 }.map { $0.1 }.joined(separator: "")
     return activeModifiers.characters.count > 0 ? "[\(activeModifiers)]" : ""
   }
 
-  private func shouldHandleError(error: NSError?) -> Bool {
+  @discardableResult
+  fileprivate func shouldHandleError(_ error: NSError?) -> Bool {
     if error == nil {
       return false
     }
     // @TODO: Do some error handling via event system
-    print("Error executing fetchRequest: \(fetchRequest). Error: \(error)")
+    print("Error executing fetchRequest: \(fetchRequest). Error: \(String(describing: error))")
     return true
   }
 }
 
-public func facade_query<A: NSManagedObject>(type: A.Type) -> Query<A> {
+public func facade_query<A: NSManagedObject>(_ type: A.Type) -> Query<A> {
   return Query(type)
 }
 
-public func facade_queryOr<A: NSManagedObject>(queries: [Query<A>]) -> Query<A> {
+public func facade_queryOr<A: NSManagedObject>(_ queries: [Query<A>]) -> Query<A> {
   return Query.or(queries)
 }

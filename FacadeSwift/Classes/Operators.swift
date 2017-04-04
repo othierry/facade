@@ -40,14 +40,14 @@ public func <=>(left: NSManagedObjectContext, right: String) -> NSManagedObjectC
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
-    concurrencyType: .MainQueueConcurrencyType)
+    concurrencyType: .mainQueueConcurrencyType)
 }
 
 public func <=>(left: Stack, right: String) -> NSManagedObjectContext {
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left.mainManagedObjectContext,
-    concurrencyType: .MainQueueConcurrencyType)
+    concurrencyType: .mainQueueConcurrencyType)
 }
 
 /**
@@ -73,14 +73,14 @@ public func <->(left: NSManagedObjectContext, right: String) -> NSManagedObjectC
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left,
-    concurrencyType: .PrivateQueueConcurrencyType)
+    concurrencyType: .privateQueueConcurrencyType)
 }
 
 public func <->(left: Stack, right: String) -> NSManagedObjectContext {
   return Stack.sharedInstance.registerChildContextWithIdentifier(
     right,
     parentManagedObjectContext: left.mainManagedObjectContext,
-    concurrencyType: .PrivateQueueConcurrencyType)
+    concurrencyType: .privateQueueConcurrencyType)
 }
 
 
@@ -123,8 +123,8 @@ public func </>(left: Stack, right: String) {
 */
 public func <-<A: NSManagedObject>(left: NSManagedObjectContext, right: A) -> A! {
   var object: A!
-  left.performBlockAndWait {
-    object = left.objectWithID(right.objectID) as! A
+  left.performAndWait {
+    object = left.object(with: right.objectID) as! A
   }
   return object
 }
