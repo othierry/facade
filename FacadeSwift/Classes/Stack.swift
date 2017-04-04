@@ -184,7 +184,7 @@ extension Stack {
   
   public func commit(
     _ managedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext,
-    withCompletionHandler completionHandler: ((NSError?) -> Void)?)
+    withCompletionHandler completionHandler: ((NSError?) -> Void)? = nil)
   {
     let complete = { error in
       DispatchQueue.main.async {

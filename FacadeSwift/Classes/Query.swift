@@ -117,7 +117,7 @@ open class Query<A: NSManagedObject> {
   open func distinct(_ on: String? = nil) -> Self {
     fetchRequest.returnsDistinctResults = true
     if let on = on {
-      fetch([on] as [AnyObject])
+      fetch([on])
     }
     return self
   }
@@ -160,7 +160,7 @@ open class Query<A: NSManagedObject> {
   }
   
   @discardableResult
-  open func groupBy(_ properties: [AnyObject]) -> Self {
+  open func groupBy(_ properties: [Any]) -> Self {
     fetchRequest.propertiesToGroupBy = properties
     return self
   }
@@ -168,7 +168,7 @@ open class Query<A: NSManagedObject> {
   /// Use this property to restrict the properties of entity A to fetch
   /// from the store
   @discardableResult
-  open func fetch(_ properties: [AnyObject]) -> Self {
+  open func fetch(_ properties: [Any]) -> Self {
     fetchRequest.propertiesToFetch = properties
     return self
   }
@@ -221,7 +221,7 @@ open class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter containedIn: the values to match againsts
   /// :return: self
-  open func with(_ key: String, containedIn objects: [AnyObject]) -> Self
+  open func with(_ key: String, containedIn objects: [Any]) -> Self
   {
     predicates.append(
       NSPredicate(
@@ -235,7 +235,7 @@ open class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter notContainedIn: the values to match againsts
   /// :return: self
-  open func with(_ key: String, notContainedIn objects: [AnyObject]) -> Self {
+  open func with(_ key: String, notContainedIn objects: [Any]) -> Self {
     predicates.append(
       NSPredicate(
         format: "NOT (\(key) IN %@)",
@@ -280,7 +280,7 @@ open class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter values: the values the entity's set/array must contain
   /// :return: self
-  open func with(_ key: String, containingAll values: [AnyObject]) -> Self {
+  open func with(_ key: String, containingAll values: [Any]) -> Self {
     predicates.append(
       NSPredicate(
         format: "ALL \(key) IN %@",
@@ -293,7 +293,7 @@ open class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter values: the values the entity's set/array must not contain
   /// :return: self
-  open func with(_ key: String, containingNone values: [AnyObject]) -> Self {
+  open func with(_ key: String, containingNone values: [Any]) -> Self {
     predicates.append(
       NSPredicate(
         format: "NONE \(key) IN %@",
@@ -306,7 +306,7 @@ open class Query<A: NSManagedObject> {
   /// - parameter key: the entity's property name
   /// - parameter values: the values the entity's set/array can contain
   /// :return: self
-  open func with(_ key: String, containingAny values: [AnyObject]) -> Self {
+  open func with(_ key: String, containingAny values: [Any]) -> Self {
     predicates.append(
       NSPredicate(
         format: "ANY \(key) IN %@",
@@ -366,7 +366,7 @@ open class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  open func with(_ key: String, equalTo value: AnyObject?, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, equalTo value: Any?, options: QueryOptions = .None) -> Self {
     guard value != nil else {
       return with(key, existing: false)
     }
@@ -389,7 +389,7 @@ open class Query<A: NSManagedObject> {
   /// - parameter caseSensitive: consider the search case sensitive
   /// - parameter diacriticSensitive: consider the search diacritic sensitive
   /// :return: self
-  open func with(_ key: String, notEqualTo value: AnyObject?, options: QueryOptions = .None) -> Self {
+  open func with(_ key: String, notEqualTo value: Any?, options: QueryOptions = .None) -> Self {
     guard value != nil else {
       return with(key, existing: true)
     }
