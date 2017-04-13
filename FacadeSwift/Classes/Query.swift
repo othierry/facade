@@ -505,6 +505,20 @@ open class Query<A: NSManagedObject> {
         argumentArray: [value]))
     return self
   }
+  
+  /// add raw predicate
+  ///
+  /// - parameter raw: the raw query string
+  /// - parameter args: varargs arguments to interpolate the query string
+  /// :return: self
+  open func with(_ raw: String, _ args: Any...) -> Self {
+    predicates.append(
+      NSPredicate(
+        format: raw,
+        argumentArray: args))
+    
+    return self
+  }
 
   /// Execute the fetch request as a count operation
   /// 
