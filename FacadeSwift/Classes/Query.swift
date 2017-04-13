@@ -63,8 +63,8 @@ open class ElasticQuery<A: NSManagedObject> {
 
 open class Query<A: NSManagedObject> {
   
-  open fileprivate(set) var managedObjectContext : NSManagedObjectContext
-  open fileprivate(set) var fetchRequest : NSFetchRequest<A>
+  open fileprivate(set) var managedObjectContext: NSManagedObjectContext
+  open fileprivate(set) var fetchRequest: NSFetchRequest<NSFetchRequestResult>
 
   internal var predicates: [NSPredicate]
   
@@ -186,7 +186,7 @@ open class Query<A: NSManagedObject> {
     setPredicate()
     
     return NSFetchedResultsController(
-      fetchRequest: self.fetchRequest,
+      fetchRequest: self.fetchRequest as! NSFetchRequest<A>,
       managedObjectContext: self.managedObjectContext,
       sectionNameKeyPath: sectionNameKeyPath,
       cacheName: cacheName)
@@ -545,7 +545,7 @@ open class Query<A: NSManagedObject> {
     setPredicate()
 
     let batchRequest = NSBatchDeleteRequest(
-      fetchRequest: self.fetchRequest as! NSFetchRequest<NSFetchRequestResult>
+      fetchRequest: self.fetchRequest
     )
     
     managedObjectContext.performAndWait {
@@ -593,15 +593,14 @@ open class Query<A: NSManagedObject> {
     return _execute() as! [NSManagedObjectID]
   }
 
-  fileprivate func _execute() -> [AnyObject]? {
+  fileprivate func _execute() -> [Any]? {
     setPredicate()
     
-    var objects: [AnyObject]?
+    var objects: [Any]?
     
     managedObjectContext.performAndWait {
       do {
-        objects = try self.managedObjectContext.fetch(
-          self.fetchRequest)
+        objects = try self.managedObjectContext.fetch(self.fetchRequest)
       } catch let error as NSError {
         if self.shouldHandleError(error) {
           print("Error executing fetchRequest: \(self.fetchRequest). Error: \(error)")
