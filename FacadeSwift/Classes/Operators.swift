@@ -121,7 +121,7 @@ public func </>(left: Stack, right: String) {
 
   SeeAlso NSManagedObject.objectWithID(_:NSManagedObjectID)
 */
-public func <-<A: NSManagedObject>(left: NSManagedObjectContext, right: A) -> A! {
+public func <-<A: NSManagedObject>(left: NSManagedObjectContext, right: A) -> A {
   var object: A!
   left.performAndWait {
     object = left.object(with: right.objectID) as! A
