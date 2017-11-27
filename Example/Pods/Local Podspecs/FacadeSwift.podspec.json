@@ -1,6 +1,6 @@
 {
   "name": "FacadeSwift",
-  "version": "0.0.1",
+  "version": "0.1.2",
   "summary": "CoreData made sexy with swift",
   "homepage": "https://github.com/othierry/facade",
   "license": "MIT",
@@ -8,8 +8,8 @@
     "Olivier Thierry": "olivier.thierry42@gmail.com"
   },
   "source": {
-    "git": "https://github.com/othierry/future.git",
-    "tag": "0.0.1"
+    "git": "https://github.com/othierry/facade.git",
+    "tag": "0.1.2"
   },
   "platforms": {
     "ios": "9.0"
