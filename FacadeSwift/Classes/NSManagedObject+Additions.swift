@@ -16,7 +16,7 @@ public extension NSManagedObject {
   /// :return String
   public class var entityName: String {
     return NSStringFromClass(self)
-      .componentsSeparatedByString(".")
+      .components(separatedBy: ".")
       .last!
   }
   
@@ -24,9 +24,9 @@ public extension NSManagedObject {
   ///
   /// :return an instance of NSEntityDescription
   public class var entityDescription : NSEntityDescription {
-    return NSEntityDescription.entityForName(
-      entityName,
-      inManagedObjectContext: Stack.sharedInstance.mainManagedObjectContext)!
+    return NSEntityDescription.entity(
+      forEntityName: entityName,
+      in: Stack.sharedInstance.mainManagedObjectContext)!
   }
 
   /// Creates a new Object of type A and insert it to the given managedObjectContext
@@ -46,8 +46,8 @@ public extension NSManagedObject {
       return
     }
     
-    managedObjectContext.performBlock {
-      managedObjectContext.deleteObject(self)
+    managedObjectContext.perform {
+      managedObjectContext.delete(self)
     }
   }
 
@@ -59,20 +59,20 @@ public extension NSManagedObject {
       return
     }
     
-    managedObjectContext.performBlockAndWait {
-      managedObjectContext.deleteObject(self)
+    managedObjectContext.performAndWait {
+      managedObjectContext.delete(self)
       managedObjectContext.processPendingChanges()
     }
   }
 
-  private class func createAutoTyped<A: NSManagedObject>(
-    inManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext) -> A
+  fileprivate class func createAutoTyped<A: NSManagedObject>(
+    _ inManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext) -> A
   {
-    let object = NSEntityDescription.insertNewObjectForEntityForName(
-      entityName,
-      inManagedObjectContext: inManagedObjectContext) as! A
+    let object = NSEntityDescription.insertNewObject(
+      forEntityName: entityName,
+      into: inManagedObjectContext) as! A
     
-    try! inManagedObjectContext.obtainPermanentIDsForObjects([object])
+    try! inManagedObjectContext.obtainPermanentIDs(for: [object])
     
     return object
   }

@@ -9,32 +9,32 @@
 import Foundation
 import CoreData
 
-public class Stack {
+open class Stack {
 
-  public class Config {
-    public var modelURL: NSURL!
-    public var storeName: String! = NSBundle.mainBundle().bundleIdentifier
-    public var storeType: String = NSSQLiteStoreType
-    public var seedURL: NSURL?
-    public var modelPrimaryKey: String?
-    public var options: [NSObject : AnyObject] = [:]
+  open class Config {
+    open var modelURL: URL!
+    open var storeName: String! = Bundle.main.bundleIdentifier
+    open var storeType: String = NSSQLiteStoreType
+    open var seedURL: URL?
+    open var modelPrimaryKey: String?
+    open var options: [AnyHashable: Any] = [:]
   }
 
-  public static let sharedInstance = Stack()
+  open static let sharedInstance = Stack()
 
-  public var config: Config = Config()
+  open var config: Config = Config()
  
-  private var managedObjectContexts: [String: NSManagedObjectContext] = [:]
+  fileprivate var managedObjectContexts: [String: NSManagedObjectContext] = [:]
 
-  private var childManagedObjectContexts: [NSManagedObjectContext] {
+  fileprivate var childManagedObjectContexts: [NSManagedObjectContext] {
     return managedObjectContexts
-      .filter { $1.parentContext == self.mainManagedObjectContext }
+      .filter { $1.parent == self.mainManagedObjectContext }
       .map { $1 }
   }
 
-  private var independentManagedObjectContexts: [NSManagedObjectContext] {
+  fileprivate var independentManagedObjectContexts: [NSManagedObjectContext] {
     return managedObjectContexts
-      .filter { $1.parentContext == self.rootManagedObjectContext }
+      .filter { $1.parent == self.rootManagedObjectContext }
       .map { $1 }
     + [mainManagedObjectContext] // Include main context as independent
   }
@@ -46,87 +46,85 @@ public class Stack {
     unregisterForManagedObjectContextNotifications()
   }
   
-  public func initialize() {
+  open func initialize() {
     registerForManagedObjectContextNotifications(mainManagedObjectContext)
     registerForManagedObjectContextNotifications(rootManagedObjectContext)
   }
 
-  public lazy var persistentStoreCoordinator: NSPersistentStoreCoordinator = {
+  open lazy var persistentStoreCoordinator: NSPersistentStoreCoordinator = {
     let persistentStoreCoordinator = NSPersistentStoreCoordinator(
       managedObjectModel: self.managedObjectModel)
     
     return persistentStoreCoordinator
   }()
   
-  public lazy var managedObjectModel: NSManagedObjectModel = {
+  open lazy var managedObjectModel: NSManagedObjectModel = {
     if let modelURL = self.config.modelURL {
       print("Loading model from \(modelURL)")
-      return NSManagedObjectModel(contentsOfURL: modelURL)!
+      return NSManagedObjectModel(contentsOf: modelURL)!
     } else {
       print("Loading model by merging bundles []")
-      return NSManagedObjectModel.mergedModelFromBundles(nil)!
+      return NSManagedObjectModel.mergedModel(from: nil)!
     }
   }()
 
-  public lazy var rootManagedObjectContext: NSManagedObjectContext = {
-    let rootManagedObjectContext = self.createManagedObjectContext(.PrivateQueueConcurrencyType)
+  open lazy var rootManagedObjectContext: NSManagedObjectContext = {
+    let rootManagedObjectContext = self.createManagedObjectContext(.privateQueueConcurrencyType)
     rootManagedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator
     rootManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     return rootManagedObjectContext
   }()
   
-  public lazy var mainManagedObjectContext: NSManagedObjectContext = {
-    let mainManagedObjectContext = self.createManagedObjectContext(.MainQueueConcurrencyType)
-    mainManagedObjectContext.parentContext = self.rootManagedObjectContext
+  open lazy var mainManagedObjectContext: NSManagedObjectContext = {
+    let mainManagedObjectContext = self.createManagedObjectContext(.mainQueueConcurrencyType)
+    mainManagedObjectContext.parent = self.rootManagedObjectContext
     mainManagedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     return mainManagedObjectContext
   }()
   
-  private lazy var applicationDocumentsDirectory: NSURL = {
-    return NSFileManager
-      .defaultManager()
-      .URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0]
+  fileprivate lazy var applicationDocumentsDirectory: URL = {
+    return FileManager.default
+      .urls(for: .documentDirectory, in: .userDomainMask)[0]
   }()
   
-  private lazy var applicationBackupDirectory: NSURL = {
+  fileprivate lazy var applicationBackupDirectory: URL = {
     let backupDirectory = self.applicationDocumentsDirectory
-      .URLByAppendingPathComponent("facade:backup")
+      .appendingPathComponent("facade:backup")
     
     guard
-      !NSFileManager.defaultManager().fileExistsAtPath(backupDirectory!.path!)
-      else { return backupDirectory! }
+      !FileManager.default.fileExists(atPath: backupDirectory.path)
+      else { return backupDirectory }
     
     // Create backup directory
-    try! NSFileManager
-      .defaultManager()
-      .createDirectoryAtURL(
-        backupDirectory!,
+    try! FileManager.default
+      .createDirectory(
+        at: backupDirectory,
         withIntermediateDirectories: true,
         attributes: nil)
     
-    return backupDirectory!
+    return backupDirectory
   }()
 }
 
 // Managed object contexts management
 extension Stack {
 
-  public func createManagedObjectContext(concurrencyType: NSManagedObjectContextConcurrencyType) -> NSManagedObjectContext {
+  public func createManagedObjectContext(_ concurrencyType: NSManagedObjectContextConcurrencyType) -> NSManagedObjectContext {
     return  NSManagedObjectContext(
       concurrencyType: concurrencyType)
   }
   
   public func registerChildContextWithIdentifier(
-    identifier: String,
+    _ identifier: String,
     parentManagedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext,
-    concurrencyType: NSManagedObjectContextConcurrencyType = .PrivateQueueConcurrencyType) -> NSManagedObjectContext
+    concurrencyType: NSManagedObjectContextConcurrencyType = .privateQueueConcurrencyType) -> NSManagedObjectContext
   {
     if let managedObjectContext = managedObjectContexts[identifier] {
       return managedObjectContext
     }
     
     let managedObjectContext = createManagedObjectContext(concurrencyType)
-    managedObjectContext.parentContext = parentManagedObjectContext
+    managedObjectContext.parent = parentManagedObjectContext
     managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
     registerForManagedObjectContextNotifications(managedObjectContext)
@@ -136,15 +134,15 @@ extension Stack {
   }
   
   public func registerIndependentContextWithIdentifier(
-    identifier: String,
-    concurrencyType: NSManagedObjectContextConcurrencyType = .PrivateQueueConcurrencyType) -> NSManagedObjectContext
+    _ identifier: String,
+    concurrencyType: NSManagedObjectContextConcurrencyType = .privateQueueConcurrencyType) -> NSManagedObjectContext
   {
     if let managedObjectContext = managedObjectContexts[identifier] {
       return managedObjectContext
     }
     
     let managedObjectContext = createManagedObjectContext(concurrencyType)
-    managedObjectContext.parentContext = rootManagedObjectContext
+    managedObjectContext.parent = rootManagedObjectContext
     managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     
     registerForManagedObjectContextNotifications(managedObjectContext)
@@ -153,22 +151,22 @@ extension Stack {
     return managedObjectContext
   }
   
-  public func unregisterContextWithIdentifier(identifier: String) {
+  public func unregisterContextWithIdentifier(_ identifier: String) {
     guard let managedObjectContext = managedObjectContexts[identifier] else {
       return
     }
 
-    managedObjectContext.performBlock {
+    managedObjectContext.perform {
       managedObjectContext.reset()
       self.unregisterForManagedObjectContextNotifications(managedObjectContext)
     }
 
     // managedObjectContext is retained by performBlock's block
     // so we can remove it now
-    self.managedObjectContexts.removeValueForKey(identifier)
+    self.managedObjectContexts.removeValue(forKey: identifier)
   }
 
-  public func identifierForContext(managedObjectContext: NSManagedObjectContext) -> String? {
+  public func identifierForContext(_ managedObjectContext: NSManagedObjectContext) -> String? {
     for (identifier, context) in managedObjectContexts {
       if context === managedObjectContext {
         return identifier
@@ -184,16 +182,16 @@ extension Stack {
 extension Stack {
   
   public func commit(
-    managedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext,
-    withCompletionHandler completionHandler: (NSError? -> Void)?)
+    _ managedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext,
+    withCompletionHandler completionHandler: ((NSError?) -> Void)?)
   {
     let complete = { error in
-      dispatch_async(dispatch_get_main_queue()) {
+      DispatchQueue.main.async {
         completionHandler?(error)
       }
     }
     
-    managedObjectContext.performBlock {
+    managedObjectContext.perform {
       guard
         managedObjectContext.hasChanges
         else { return complete(nil) }
@@ -202,8 +200,7 @@ extension Stack {
         try managedObjectContext.save()
         
         guard
-          let parentManagedObjectContext = managedObjectContext.parentContext
-          where parentManagedObjectContext != self.rootManagedObjectContext
+          let parentManagedObjectContext = managedObjectContext.parent, parentManagedObjectContext != self.rootManagedObjectContext
           else { return complete(nil) }
         
         self.commit(
@@ -217,9 +214,9 @@ extension Stack {
   }
   
   public func commitSync(
-    managedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext)
+    _ managedObjectContext: NSManagedObjectContext = Stack.sharedInstance.mainManagedObjectContext)
   {
-    managedObjectContext.performBlockAndWait {
+    managedObjectContext.performAndWait {
       guard
         managedObjectContext.hasChanges
         else { return }
@@ -228,8 +225,7 @@ extension Stack {
         try managedObjectContext.save()
         managedObjectContext.processPendingChanges()
         
-        if let parentManagedObjectContext = managedObjectContext.parentContext
-          where parentManagedObjectContext != self.rootManagedObjectContext
+        if let parentManagedObjectContext = managedObjectContext.parent, parentManagedObjectContext != self.rootManagedObjectContext
         {
           self.commitSync(parentManagedObjectContext)
         }
@@ -244,45 +240,43 @@ extension Stack {
 // Notifications & Merging
 extension Stack {
 
-  private func registerForManagedObjectContextNotifications(managedObjectContext: NSManagedObjectContext) {
-    NSNotificationCenter
-      .defaultCenter()
+  fileprivate func registerForManagedObjectContextNotifications(_ managedObjectContext: NSManagedObjectContext) {
+    NotificationCenter.default
       .addObserver(
         self,
         selector: #selector(managedObjectContextDidSave),
-        name: NSManagedObjectContextDidSaveNotification,
+        name: NSNotification.Name.NSManagedObjectContextDidSave,
         object: managedObjectContext)
   }
   
-  private func unregisterForManagedObjectContextNotifications(managedObjectContext: NSManagedObjectContext? = nil) {
-    NSNotificationCenter
-      .defaultCenter()
+  fileprivate func unregisterForManagedObjectContextNotifications(_ managedObjectContext: NSManagedObjectContext? = nil) {
+    NotificationCenter.default
       .removeObserver(
         self,
-        name: NSManagedObjectContextDidSaveNotification,
+        name: NSNotification.Name.NSManagedObjectContextDidSave,
         object: managedObjectContext)
   }
 
   @objc
-  private func managedObjectContextDidSave(notification: NSNotification) {
+  fileprivate func managedObjectContextDidSave(_ notification: Notification) {
     guard
       let savedManagedObjectContext = notification.object as? NSManagedObjectContext
       else { return }
 
     // Break retain cycles and release memory
-    savedManagedObjectContext.performBlock {
+    savedManagedObjectContext.perform {
       savedManagedObjectContext.refreshAllObjects()
     }
 
     guard
-      savedManagedObjectContext.parentContext == self.rootManagedObjectContext
+      savedManagedObjectContext.parent == self.rootManagedObjectContext
       else { return }
 
     // Independent context
     for independentManagedObjectContext in independentManagedObjectContexts
       where independentManagedObjectContext != savedManagedObjectContext
     {
-      independentManagedObjectContext.performBlock {
+      independentManagedObjectContext.perform {
         // NSManagedObjectContext's merge routine ignores updated objects which aren't
         // currently faulted in. To force it to notify interested clients that such
         // objects have been refreshed (e.g. NSFetchedResultsController) we need to
@@ -290,13 +284,13 @@ extension Stack {
         // SEE: http://mikeabdullah.net/merging-saved-changes-betwe.html
         if let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject> {
           for updatedObject in updatedObjects {
-            let _ = try? independentManagedObjectContext.existingObjectWithID(updatedObject.objectID)
+            let _ = try? independentManagedObjectContext.existingObject(with: updatedObject.objectID)
           }
         }
 
         // Merge changes on the idependent context
-        independentManagedObjectContext.mergeChangesFromContextDidSaveNotification(
-          notification)
+        independentManagedObjectContext.mergeChanges(
+          fromContextDidSave: notification)
 
         // Break retain cycles, release unnessecary memory
         // after the merge occurs
@@ -317,37 +311,37 @@ extension Stack {
 
   public var installed: Bool {
     let storePath = applicationDocumentsDirectory
-      .URLByAppendingPathComponent("\(self.config.storeName!).sqlite")!
-      .path!
+      .appendingPathComponent("\(self.config.storeName!).sqlite")
+      .path
     
-    return NSFileManager
-      .defaultManager()
-      .fileExistsAtPath(storePath)
+    return FileManager
+      .default
+      .fileExists(atPath: storePath)
   }
 
   public func connect() throws {
     let storeURL = self.applicationDocumentsDirectory
-      .URLByAppendingPathComponent(self.config.storeName!)!
-      .URLByAppendingPathExtension("sqlite")
+      .appendingPathComponent(self.config.storeName!)
+      .appendingPathExtension("sqlite")
     
-    try persistentStoreCoordinator.addPersistentStoreWithType(
-      self.config.storeType,
-      configuration: nil,
-      URL: storeURL,
+    try persistentStoreCoordinator.addPersistentStore(
+      ofType: self.config.storeType,
+      configurationName: nil,
+      at: storeURL,
       options: self.config.options)
   }
 
   public func backup() throws {
     for persistentStore in persistentStoreCoordinator.persistentStores {
-      if let persistentStoreFileName = persistentStore.URL?.lastPathComponent {
+      if let persistentStoreFileName = persistentStore.url?.lastPathComponent {
         let storeBackupUrl = applicationBackupDirectory
-          .URLByAppendingPathComponent("backup-\(persistentStoreFileName)")
+          .appendingPathComponent("backup-\(persistentStoreFileName)")
         
         print("Backing up store to: \(storeBackupUrl)")
         
         try persistentStoreCoordinator.migratePersistentStore(
           persistentStore,
-          toURL: storeBackupUrl!,
+          to: storeBackupUrl,
           options: [
             NSSQLitePragmasOption: ["journal_mode": "DELETE"],
             NSSQLiteManualVacuumOption: true
@@ -360,16 +354,16 @@ extension Stack {
   public func drop() throws {
     print("Dropping database...")
     
-    let fileManager = NSFileManager.defaultManager()
+    let fileManager = FileManager.default
     
     for fileExtension in ["sqlite", "sqlite-shm", "sqlite-wal"] {
       let filePath = applicationDocumentsDirectory
-        .URLByAppendingPathComponent("\(self.config.storeName!).\(fileExtension)")!
-        .path!
+        .appendingPathComponent("\(self.config.storeName!).\(fileExtension)")
+        .path
       
-      if fileManager.fileExistsAtPath(filePath) {
+      if fileManager.fileExists(atPath: filePath) {
         print("Dropping \(filePath)...")
-        try fileManager.removeItemAtPath(filePath)
+        try fileManager.removeItem(atPath: filePath)
       }
     }
     
@@ -386,21 +380,20 @@ extension Stack {
 
     guard let seedURL = self.config.seedURL else {
       throw NSError(
-        domain: "Seed file not found: \(self.config.seedURL)",
+        domain: "Seed file not specified using self.config.seedURL",
         code: 1000,
         userInfo: nil)
     }
 
     let destinationURL = applicationDocumentsDirectory
-      .URLByAppendingPathComponent("\(storeName).sqlite")
+      .appendingPathComponent("\(storeName).sqlite")
 
     print("Copying snapshot from \(seedURL) to \(destinationURL)")
 
-    try NSFileManager
-      .defaultManager()
-      .copyItemAtURL(
-        seedURL,
-        toURL: destinationURL!)
+    try FileManager.default
+      .copyItem(
+        at: seedURL,
+        to: destinationURL)
     
     print("Database successfuly seeded.")
   }
